@@ -10,7 +10,7 @@
 (function (window) {
   'use strict';
 
-  const HARDCODED_API_KEY = 'AQ.Ab8RN6JEuBifsgdAq0fde4JnxtZLILnfvZiYnxuiJtz2CpK0YA';
+  const HARDCODED_API_KEY = 'AQ.Ab8RN6JmjR7Yx5uDNh1LtMs4rtm4vhEbEAdzAaFBI6LJ5KoL2Q';
 
   const STORAGE_KEYS = Object.freeze({
     API_KEY: 'entropia_raphael_gemini_key',

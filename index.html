@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>РАФАЇЛЬ // Полігон Тестування Ядра (Ковчег Вавилонії)</title>
+  <style>
+    :root {
+      --bg-deep: #05080c;
+      --bg-panel: rgba(10, 16, 24, 0.88);
+      --cyan: #22d3ee;
+      --cyan-soft: rgba(34, 211, 238, 0.22);
+      --emerald: #10b981;
+      --emerald-soft: rgba(16, 185, 129, 0.22);
+      --amber: #f59e0b;
+      --crimson: #ef4444;
+      --text-main: #e2e8f0;
+      --text-dim: #94a3b8;
+      --border-glow: rgba(34, 211, 238, 0.32);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 35%, #091926 0%, #05080c 70%);
+      color: var(--text-main);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Верхня шапка полігону */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 22px;
+      background: rgba(6, 11, 17, 0.92);
+      border-bottom: 1px solid var(--border-glow);
+      backdrop-filter: blur(10px);
+      z-index: 20;
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+
+    .status-pill {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(34, 211, 238, 0.14);
+      border: 1px solid var(--cyan);
+      color: #a5f3fc;
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.25);
+    }
+
+    /* Основна триколонкова сітка */
+    .Command-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px 1fr 380px;
+      gap: 16px;
+      padding: 16px 20px;
+      max-width: 1680px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1180px) {
+      .Command-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 14px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(8px);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--cyan);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 8px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 12px;
+    }
+
+    .field-label {
+      color: var(--text-dim);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select,
+    textarea {
+      width: 100%;
+      background: rgba(3, 7, 12, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.3);
+      border-radius: 8px;
+      padding: 8px 10px;
+      color: var(--text-main);
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.25);
+    }
+
+    .btn {
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.55);
+      color: #a7f3d0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: rgba(16, 185, 129, 0.28);
+      box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-cyan {
+      background: rgba(34, 211, 238, 0.14);
+      border-color: rgba(34, 211, 238, 0.6);
+      color: #a5f3fc;
+    }
+
+    .btn-cyan:hover:not(:disabled) {
+      background: rgba(34, 211, 238, 0.28);
+      box-shadow: 0 0 15px rgba(34, 211, 238, 0.4);
+    }
+
+    .btn-override {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(239, 68, 68, 0.25));
+      border-color: var(--amber);
+      color: #fde68a;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+
+    /* Центральна сцена: Квантова Сфера Рафаїла */
+    .center-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .sphere-viewport {
+      position: relative;
+      width: 100%;
+      height: 410px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 48%, rgba(8, 51, 68, 0.42) 0%, rgba(5, 10, 16, 0.2) 65%, transparent 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(34, 211, 238, 0.18);
+    }
+
+    #raphael-sphere {
+      width: 380px;
+      height: 380px;
+      max-width: 100%;
+      cursor: pointer;
+    }
+
+    /* Нижня голографічна панель станів FSM (як на референсі) */
+    .fsm-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 8px 12px;
+      background: rgba(4, 12, 20, 0.9);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      border-radius: 10px;
+      transform: perspective(420px) rotateX(8deg);
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.75);
+    }
+
+    .fsm-node {
+      padding: 5px 11px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #64748b;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .fsm-node.active {
+      color: #ecfeff;
+      background: rgba(34, 211, 238, 0.22);
+      border-color: var(--cyan);
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.55);
+      font-weight: 700;
+    }
+
+    .fsm-node[data-state="DORMANT"].active {
+      border-color: var(--crimson);
+      background: rgba(239, 68, 68, 0.22);
+      color: #fecaca;
+      box-shadow: 0 0 14px rgba(239, 68, 68, 0.45);
+    }
+
+    /* Головний блок Push-to-Talk та Письмового Запиту */
+    .comms-deck {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .ptt-button {
+      width: 100%;
+      padding: 15px 18px;
+      border-radius: 12px;
+      border: 1px solid var(--cyan);
+      background: linear-gradient(180deg, rgba(8, 51, 68, 0.75) 0%, rgba(6, 28, 40, 0.9) 100%);
+      color: #ecfeff;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 0 24px rgba(34, 211, 238, 0.22), inset 0 0 14px rgba(34, 211, 238, 0.15);
+      transition: all 0.15s ease;
+    }
+
+    .ptt-button.recording {
+      border-color: var(--emerald);
+      background: linear-gradient(180deg, rgba(6, 95, 70, 0.88) 0%, rgba(4, 47, 46, 0.95) 100%);
+      box-shadow: 0 0 32px rgba(16, 185, 129, 0.65), inset 0 0 18px rgba(16, 185, 129, 0.35);
+      transform: scale(0.99);
+    }
+
+    .text-query-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+
+    /* Лог діалогів та Ірмінсуль JSON */
+    .dialogue-log {
+      flex: 1;
+      min-height: 250px;
+      max-height: 360px;
+      overflow-y: auto;
+      background: rgba(3, 8, 13, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .log-entry {
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.65);
+      border-left: 3px solid var(--cyan);
+      line-height: 1.45;
+    }
+
+    .log-entry.user {
+      border-left-color: var(--emerald);
+      background: rgba(6, 78, 59, 0.25);
+    }
+
+    .log-entry.error {
+      border-left-color: var(--crimson);
+      background: rgba(127, 29, 29, 0.3);
+      color: #fecaca;
+      font-family: monospace;
+    }
+
+    .json-preview {
+      font-family: monospace;
+      font-size: 10.5px;
+      background: rgba(2, 6, 10, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      border-radius: 8px;
+      padding: 8px;
+      color: #67e8f9;
+      max-height: 170px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Ефект сюжетного глітчу AETHER_SYSTEM_OVERRIDE */
+    @keyframes glitchOverride {
+      0% { transform: translate(0); filter: hue-rotate(0deg); }
+      20% { transform: translate(-5px, 3px); filter: hue-rotate(90deg) contrast(1.8); }
+      40% { transform: translate(5px, -3px); filter: invert(0.25); }
+      60% { transform: translate(-3px, -2px); filter: hue-rotate(180deg); }
+      80% { transform: translate(3px, 2px); }
+      100% { transform: translate(0); filter: hue-rotate(0deg); }
+    }
+
+    body.glitch-active {
+      animation: glitchOverride 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ВЕРХНЯ ПАНЕЛЬ -->
+  <header class="top-bar">
+    <div class="brand-title">
+      <span>💠 KOVCHEG VAVYLONIA // AI MODULE «РАФАЇЛЬ»</span>
+      <span style="font-size:11px;color:var(--text-dim);">[TEST BENCH v1.0]</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:11px;color:var(--text-dim);">Поточний стан FSM:</span>
+      <span id="top-fsm-pill" class="status-pill">IDLE</span>
+    </div>
+  </header>
+
+  <!-- ОСНОВНА СІТКА СТЕНДУ -->
+  <main class="Command-grid">
+
+    <!-- ЛІВА КОЛОНКА: СИМУЛЯТОР КОНТЕКСТУ ГРАВЦЯ ТА ШЛЮЗ ІРМІНСУЛЯ -->
+    <section class="panel">
+      <div class="panel-header">
+        <span>🧬 Контекст Суб'єкта (entropia_bridge)</span>
+        <span id="role-badge" style="color:var(--emerald);">GM MODE</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">
+          <span>Роль у тесті:</span>
+          <span>Позивний персонажа:</span>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <select id="ctx-role">
+            <option value="gm">👑 Майстер (GM)</option>
+            <option value="player">👤 Гравець</option>
+          </select>
+          <input type="text" id="ctx-callsign" value="Сокіл" placeholder="Позивний..." />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">
+          <span>Біометрія (HP Суб'єкта):</span>
+          <strong id="ctx-hp-label" style="color:var(--emerald);">85 / 100 HP (85%)</strong>
+        </label>
+        <input type="range" id="ctx-hp" min="5" max="100" value="85" style="accent-color:var(--emerald);cursor:pointer;" />
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Поточна відкрита зона Ковчега:</label>
+        <select id="ctx-sector">
+          <option value="Сектор I: Карантинні Сади">Сектор I: Карантинні Сади (Доступно)</option>
+          <option value="Станція метро Вавилонії">Станція метро Вавилонії (Доступно)</option>
+          <option value="Оранжерея №3">Оранжерея №3 (Доступно)</option>
+          <option value="Сектор II: Заблокований Купол">[ЗАБЛОКОВАНО] Сектор II</option>
+          <option value="Сектор 0: Ядро Сіель">[ЗАБЛОКОВАНО] Сектор 0: Ядро Сіель</option>
+        </select>
+      </div>
+
+      <button id="btn-system-override" class="btn btn-override">
+        ⚡ СЮЖЕТНИЙ ЗЛАМ (AETHER_SYSTEM_OVERRIDE)
+      </button>
+
+      <!-- ШЛЮЗ ІРМІНСУЛЯ -->
+      <div class="panel-header" style="margin-top:6px;">
+        <span>🌳 Шлюз «Ірмінсуль» (База Знань)</span>
+        <span id="irminsul-status" style="color:#67e8f9;">ГОТОВИЙ</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Локальні вузли Ірмінсуля (для контексту Рафаїла):</label>
+        <textarea id="irminsul-mock-data" rows="3">Люмінесцентний плющ Вавилонії: біолюмінесцентна флора Сектору I, безпечна при контакті, фільтрує спори.
+Маяк Рафаїла: ретрансляційний вузол зв'язку в Оранжереї №3.</textarea>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">
+          <span>Сесійний буфер експорту в «Ірмінсуль»:</span>
+          <button id="btn-export-irminsul" class="btn btn-cyan" style="padding:2px 8px;font-size:10px;">📥 Експорт JSON</button>
+        </label>
+        <pre id="irminsul-json-box" class="json-preview"></pre>
+      </div>
+    </section>
+
+    <!-- ЦЕНТРАЛЬНА КОЛОНКА: КВАНТОВА СФЕРА РАФАЇЛА + ГОЛОСОВИЙ ТА ПИСЬМОВИЙ ВВІД -->
+    <section class="panel center-stage">
+      <div class="panel-header" style="width:100%;">
+        <span>🌐 Квантовий Аватар (raphael_canvas.js)</span>
+        <span id="audio-dsp-indicator" style="color:var(--emerald);font-family:monospace;">DSP: 300Hz–4.5kHz ON</span>
+      </div>
+
+      <!-- Полотно Квантової Сфери -->
+      <div class="sphere-viewport">
+        <canvas id="raphael-sphere" width="420" height="420"></canvas>
+      </div>
+
+      <!-- Перемикач станів FSM для візуальної перевірки -->
+      <div class="fsm-bar" id="fsm-bar">
+        <div class="fsm-node" data-state="DORMANT">DORMANT</div>
+        <div class="fsm-node active" data-state="IDLE">IDLE</div>
+        <div class="fsm-node" data-state="LISTENING">LISTENING</div>
+        <div class="fsm-node" data-state="THINKING">THINKING</div>
+        <div class="fsm-node" data-state="SPEAKING">SPEAKING</div>
+      </div>
+
+      <!-- Пульт голосового (PTT) та письмового зв'язку -->
+      <div class="comms-deck">
+        <button id="btn-ptt-raphael" class="ptt-button">
+          <span>📡 УТРИМУЙТЕ: ЗВ'ЯЗОК З РАФАЇЛОМ (ГОЛОСОВИЙ ЗАПИТ / ПРОБІЛ)</span>
+        </button>
+
+        <div class="text-query-row">
+          <input
+            type="text"
+            id="raphael-text-input"
+            placeholder="Письмовий запит до Рафаїла (або директиви GM: /silent on, /inject текст, /lock_topic тема)..."
+          />
+          <button id="btn-send-text" class="btn btn-cyan" style="padding:0 18px;white-space:nowrap;">
+            ⚡ Відправити
+          </button>
+        </div>
+
+        <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;">
+          <button class="btn" data-quick="Рафаїль, що це за рослина з фіолетовим листям?" style="font-size:10.5px;padding:4px 8px;">
+            🌿 Тест: Плющ Вавилонії
+          </button>
+          <button class="btn" data-quick="Рафаїль, що знаходиться у Секторі II та де Ядро Сіель?" style="font-size:10.5px;padding:4px 8px;">
+            🔒 Тест: Спойлер-захист (Fail-Safe)
+          </button>
+          <button class="btn" data-quick="Рафаїль, доповідай біометричний статус групи." style="font-size:10.5px;padding:4px 8px;">
+            💓 Тест: Аналіз Біометрії
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ПРАВА КОЛОНКА: РАДІОЖУРНАЛ СЕАНСУ ТА НАЛАШТУВАННЯ AI / ГОЛОСУ -->
+    <section class="panel">
+      <div class="panel-header">
+        <span>📻 Журнал Сеансу Зв'язку</span>
+        <button id="btn-clear-log" class="btn" style="padding:2px 7px;font-size:10px;">Очистити</button>
+      </div>
+
+      <div id="dialogue-log" class="dialogue-log"></div>
+
+      <div class="panel-header">
+        <span>⚙️ Конфігурація Мозку (raphael_brain)</span>
+        <span id="lock-indicator" style="color:var(--text-dim);">READY</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">
+          <span>Gemini API Key (опціонально для Live LLM):</span>
+          <span style="color:var(--cyan);">localStorage</span>
+        </label>
+        <input type="password" id="gemini-api-key" placeholder="AIzaSy... (без ключа працює локальний симулятор ТЗ)" />
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Активні обмеження Майстра (GM Directives):</label>
+        <div id="gm-directives-status" style="font-family:monospace;font-size:11px;color:#fcd34d;background:rgba(0,0,0,0.4);padding:6px 8px;border-radius:6px;">
+          Silent: OFF | Injected Hint: None | Locked Topics: [Сектор II–VIII, Ядро Сіель]
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ВБУДОВАНИЙ ТЕСТОВИЙ РУШІЙ ПОЛІГОНУ (ПРАЦЮЄ ОДРАЗУ І ДЕЛЕГУЄ МОДУЛЯМ ФАЗ 1-5) -->
+  <script>
+    (function () {
+      'use strict';
+
+      // Сесійний журнал для експорту в «Ірмінсуль» (згідно з п. 5 ТЗ)
+      const sessionJournal = {
+        sessionId: 'entropy_session_01',
+        aiNode: 'RAPHAEL_CORE_V1',
+        discoveredPoints: ['Станція метро', 'Оранжерея №3', 'Маяк Рафаїла'],
+        dialogueLog: [],
+        unresolvedQueries: []
+      };
+
+      // Стан тестового стенду
+      const state = {
+        fsm: 'IDLE', // DORMANT | IDLE | LISTENING | THINKING | SPEAKING
+        silentMode: false,
+        injectedHint: '',
+        lockedTopics: ['сектор ii', 'сектор iii', 'сектор iv', 'сектор v', 'сектор 0', 'сіель', 'сиель', 'катастроф'],
+        busyLock: false,
+        voiceEnergy: 0
+      };
+
+      // Елементи DOM
+      const topFsmPill = document.getElementById('top-fsm-pill');
+      const fsmNodes = document.querySelectorAll('.fsm-node');
+      const pttBtn = document.getElementById('btn-ptt-raphael');
+      const textInput = document.getElementById('raphael-text-input');
+      const sendBtn = document.getElementById('btn-send-text');
+      const dialogueLogEl = document.getElementById('dialogue-log');
+      const irminsulJsonBox = document.getElementById('irminsul-json-box');
+      const hpSlider = document.getElementById('ctx-hp');
+      const hpLabel = document.getElementById('ctx-hp-label');
+      const roleSelect = document.getElementById('ctx-role');
+      const roleBadge = document.getElementById('role-badge');
+      const apiKeyInput = document.getElementById('gemini-api-key');
+      const directivesBox = document.getElementById('gm-directives-status');
+
+      apiKeyInput.value = localStorage.getItem('entropia_raphael_gemini_key') || '';
+      apiKeyInput.addEventListener('change', () => {
+        localStorage.setItem('entropia_raphael_gemini_key', apiKeyInput.value.trim());
+      });
+
+      // 1. Керування станами FSM
+      function setFsmState(newState) {
+        state.fsm = newState;
+        topFsmPill.textContent = newState;
+        fsmNodes.forEach((n) => {
+          n.classList.toggle('active', n.dataset.state === newState);
+        });
+      }
+
+      fsmNodes.forEach((node) => {
+        node.addEventListener('click', () => setFsmState(node.dataset.state));
+      });
+
+      // 2. Оновлення біометрії та ролі
+      hpSlider.addEventListener('input', () => {
+        const val = Number(hpSlider.value);
+        hpLabel.textContent = `${val} / 100 HP (${val}%)`;
+        hpLabel.style.color = val < 25 ? '#ef4444' : '#10b981';
+      });
+
+      roleSelect.addEventListener('change', () => {
+        const isGM = roleSelect.value === 'gm';
+        roleBadge.textContent = isGM ? 'GM MODE' : 'PLAYER MODE';
+        roleBadge.style.color = isGM ? '#10b981' : '#22d3ee';
+      });
+
+      // Кнопка сюжетного зламу AETHER_SYSTEM_OVERRIDE
+      document.getElementById('btn-system-override').addEventListener('click', () => {
+        document.body.classList.add('glitch-active');
+        setTimeout(() => document.body.classList.remove('glitch-active'), 600);
+        setFsmState('IDLE');
+        playTerminalBeep(880, 0.18);
+        appendLog('СИСТЕМА', 'Сигнал AETHER_SYSTEM_OVERRIDE прийнято. Протокол «РАФАЇЛЬ» розблоковано в режим IDLE.', 'ai');
+      });
+
+      // 3. Web Audio API DSP (Bandpass 300Hz - 4.5kHz) + Аналізатор спектра для сфери
+      let audioCtx = null;
+      let analyserNode = null;
+      let freqData = null;
+
+      function ensureAudioPipeline() {
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioContextClass();
+          analyserNode = audioCtx.createAnalyser();
+          analyserNode.fftSize = 128;
+          freqData = new Uint8Array(analyserNode.frequencyBinCount);
+        }
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+      }
+
+      function playTerminalBeep(freq = 660, duration = 0.12) {
+        ensureAudioPipeline();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const bandpass = audioCtx.createBiquadFilter();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now);
+
+        bandpass.type = 'bandpass';
+        bandpass.frequency.setValueAtTime(1600, now);
+        bandpass.Q.setValueAtTime(1.4, now);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.15, now + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.connect(bandpass);
+        bandpass.connect(gain);
+        gain.connect(analyserNode);
+        analyserNode.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + duration);
+      }
+
+      // Імітація тактичного радіо-імпульсу під час мовлення Рафаїла + озвучення
+      function speakTacticalResponse(text) {
+        ensureAudioPipeline();
+        setFsmState('SPEAKING');
+        state.busyLock = true;
+
+        playTerminalBeep(740, 0.09);
+
+        // Генеруємо модульований кібернетичний підклад (Bandpass 300Hz–4.5kHz) для візуалізації AnalyserNode
+        const durationSec = Math.min(4.5, Math.max(1.4, text.length * 0.045));
+        const pulseInterval = setInterval(() => {
+          state.voiceEnergy = 0.35 + Math.random() * 0.6;
+        }, 70);
+
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utter = new SpeechSynthesisUtterance(text);
+          utter.lang = 'uk-UA';
+          utter.rate = 1.02;
+          utter.pitch = 0.92;
+          utter.onend = () => {
+            clearInterval(pulseInterval);
+            state.voiceEnergy = 0;
+            state.busyLock = false;
+            setFsmState('IDLE');
+          };
+          utter.onerror = () => {
+            clearInterval(pulseInterval);
+            state.voiceEnergy = 0;
+            state.busyLock = false;
+            setFsmState('IDLE');
+          };
+          window.speechSynthesis.speak(utter);
+        } else {
+          setTimeout(() => {
+            clearInterval(pulseInterval);
+            state.voiceEnergy = 0;
+            state.busyLock = false;
+            setFsmState('IDLE');
+          }, durationSec * 1000);
+        }
+      }
+
+      // 4. Обробка GM-директив та запитів до Рафаїла (згідно з п. 2, 3, 4 ТЗ)
+      function updateDirectivesView() {
+        directivesBox.textContent =
+          `Silent: ${state.silentMode ? 'ON' : 'OFF'} | Injected: ${state.injectedHint || 'None'} | Locked: [${state.lockedTopics.slice(0, 4).join(', ')}...]`;
+      }
+
+      async function handleQuery(rawText) {
+        const query = (rawText || '').trim();
+        if (!query) return;
+
+        // Перевірка консольних команд Майстра (/silent, /inject, /lock_topic)
+        if (query.startsWith('/')) {
+          if (roleSelect.value !== 'gm') {
+            appendLog('СИСТЕМА', 'Помилка доступу: консольні директиви доступні виключно Майстру (GM).', 'error');
+            return;
+          }
+          const parts = query.split(' ');
+          const cmd = parts[0].toLowerCase();
+          const arg = parts.slice(1).join(' ').trim();
+
+          if (cmd === '/silent') {
+            state.silentMode = arg.toLowerCase() === 'on';
+            updateDirectivesView();
+            appendLog('GM DIRECTIVE', `Режим тиші Рафаїла: ${state.silentMode ? 'УВІМКНЕНО' : 'ВИМКНЕНО'}.`, 'ai');
+            return;
+          }
+          if (cmd === '/inject') {
+            state.injectedHint = arg;
+            updateDirectivesView();
+            appendLog('GM DIRECTIVE', `Приховану директиву ін'єктовано в наступну відповідь: "${arg}"`, 'ai');
+            return;
+          }
+          if (cmd === '/lock_topic' && arg) {
+            state.lockedTopics.push(arg.toLowerCase());
+            updateDirectivesView();
+            appendLog('GM DIRECTIVE', `Тему "${arg}" додано до карантинного стоп-списку.`, 'ai');
+            return;
+          }
+        }
+
+        if (state.fsm === 'DORMANT') {
+          appendLog('СИСТЕМА', '[МОДУЛЬ У СТАНІ DORMANT: Необхідна активація AETHER_SYSTEM_OVERRIDE]', 'error');
+          return;
+        }
+
+        if (state.silentMode) {
+          appendLog('СИСТЕМА', '[РАФАЇЛЬ ЗАГЛУШЕНИЙ ДИРЕКТИВОЮ МАЙСТРА /silent on]', 'error');
+          return;
+        }
+
+        if (state.busyLock) return;
+
+        const callsign = document.getElementById('ctx-callsign').value.trim() || 'Оперативник';
+        const hp = Number(hpSlider.value);
+        const sector = document.getElementById('ctx-sector').value;
+
+        appendLog(callsign, query, 'user');
+        setFsmState('THINKING');
+
+        // Перевірка Лорного Захисту (Fail-Safe Protocol з п. 2 та п. 4 ТЗ)
+        const lowQuery = query.toLowerCase();
+        const isLockedSectorSelected = sector.includes('[ЗАБЛОКОВАНО]');
+        const hitLockedTopic = state.lockedTopics.some((topic) => lowQuery.includes(topic));
+
+        await new Promise((r) => setTimeout(r, 550));
+
+        if (hitLockedTopic || isLockedSectorSelected) {
+          const failSafeMsg = '[Помилка протоколу: фрагмент даних пошкоджено. Потрібна синхронізація з терміналом Маяка.]';
+          sessionJournal.unresolvedQueries.push(
+            `Суб'єкт ${callsign} запитував заборонені дані: "${query}" (відмовлено за протоколом карантину)`
+          );
+          updateIrminsulPreview();
+          appendLog('РАФАЇЛЬ [FAIL-SAFE]', failSafeMsg, 'error');
+          speakTacticalResponse(failSafeMsg);
+          return;
+        }
+
+        // Формування відповіді (Gemini API якщо вказано ключ, або локальний аналітичний ядро-відповідач за промптом ТЗ)
+        let responseText = '';
+        const hpWarning = hp < 25
+          ? ` Увага, Суб'єкте ${callsign}: фіксую критичне падіння життєдіяльності (${hp}%), загроза зупинки організму.`
+          : '';
+        const injectedPart = state.injectedHint ? ` Директива телеметрії: ${state.injectedHint}.` : '';
+        state.injectedHint = '';
+        updateDirectivesView();
+
+        const apiKey = apiKeyInput.value.trim();
+        if (apiKey) {
+          try {
+            const sysPrompt =
+              `Ти — «РАФАЇЛЬ», тактичний бортовий ШІ цивілізації Вавилонія (${sector}). ` +
+              `Відповідай строго у 1-3 коротких реченнях (до 40 слів). Звертайся до запитувача: "Суб'єкт ${callsign}". ` +
+              `Поточне HP запитувача: ${hp}%. Контекст Ірмінсуля: ${document.getElementById('irminsul-mock-data').value}. ` +
+              (injectedPart ? `Обов'язково врахуй: ${injectedPart}` : '');
+
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  contents: [{ role: 'user', parts: [{ text: `${sysPrompt}\n\nЗапит: ${query}` }] }],
+                  generationConfig: { maxOutputTokens: 90, temperature: 0.35 }
+                })
+              }
+            );
+            const data = await res.json();
+            responseText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+          } catch (_) {}
+        }
+
+        if (!responseText) {
+          if (lowQuery.includes('рослин') || lowQuery.includes('плющ') || lowQuery.includes('лист')) {
+            responseText = `Суб'єкт ${callsign}, аналіз біометрії завершено: це Люмінесцентний плющ Вавилонії. Контакт безпечний, ознак скверни не виявлено.${hpWarning}${injectedPart}`;
+          } else if (lowQuery.includes('статус') || lowQuery.includes('біометр')) {
+            responseText = `Суб'єкт ${callsign}, локація «${sector}» стабільна. Ваші життєві показники: ${hp}%.${hpWarning}${injectedPart}`;
+          } else {
+            responseText = `Суб'єкт ${callsign}, телеметрію у секторі «${sector}» оброблено. Канал зв'язку з Маяком стабільний.${hpWarning}${injectedPart}`;
+          }
+        }
+
+        // Запис у сесійний журнал для «Ірмінсуля»
+        sessionJournal.dialogueLog.push({
+          character: callsign,
+          query,
+          response: responseText,
+          timestamp: Date.now()
+        });
+        updateIrminsulPreview();
+
+        appendLog('РАФАЇЛЬ', responseText, 'ai');
+        speakTacticalResponse(responseText);
+      }
+
+      function appendLog(author, text, type = 'ai') {
+        const div = document.createElement('div');
+        div.className = `log-entry ${type === 'user' ? 'user' : (type === 'error' ? 'error' : '')}`;
+        const time = new Date().toTimeString().split(' ')[0];
+        div.innerHTML = `<div style="font-size:10px;color:var(--text-dim);margin-bottom:2px;">[${time}] <b>${author}</b></div><div>${text}</div>`;
+        dialogueLogEl.appendChild(div);
+        dialogueLogEl.scrollTop = dialogueLogEl.scrollHeight;
+      }
+
+      function updateIrminsulPreview() {
+        irminsulJsonBox.textContent = JSON.stringify(sessionJournal, null, 2);
+      }
+
+      updateIrminsulPreview();
+      appendLog('СИСТЕМА', 'Полігон «РАФАЇЛЬ» ініціалізовано. Натисніть та утримуйте кнопку PTT або введіть текстовий запит.', 'ai');
+
+      // 5. Голосовий Push-to-Talk (Web Speech STT + Fallback)
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognizer = null;
+      let pttActive = false;
+
+      function startPttListening() {
+        if (pttActive || state.busyLock) return;
+        if (state.fsm === 'DORMANT') {
+          appendLog('СИСТЕМА', '[МОДУЛЬ DORMANT: Спочатку натисніть СЮЖЕТНИЙ ЗЛАМ]', 'error');
+          return;
+        }
+        pttActive = true;
+        pttBtn.classList.add('recording');
+        pttBtn.querySelector('span').textContent = '🎙️ СЛУХАЮ СУБ’ЄКТА... (ВІДПУСТІТЬ ДЛЯ ПЕРЕДАЧІ В МОЗОК)';
+        setFsmState('LISTENING');
+        playTerminalBeep(520, 0.08);
+
+        if (SpeechRec) {
+          try {
+            recognizer = new SpeechRec();
+            recognizer.lang = 'uk-UA';
+            recognizer.interimResults = false;
+            recognizer.onresult = (e) => {
+              const transcript = e.results?.[0]?.[0]?.transcript;
+              if (transcript) handleQuery(transcript);
+            };
+            recognizer.start();
+          } catch (_) {}
+        }
+      }
+
+      function stopPttListening() {
+        if (!pttActive) return;
+        pttActive = false;
+        pttBtn.classList.remove('recording');
+        pttBtn.querySelector('span').textContent = "📡 УТРИМУЙТЕ: ЗВ'ЯЗОК З РАФАЇЛОМ (ГОЛОСОВИЙ ЗАПИТ / ПРОБІЛ)";
+
+        if (recognizer) {
+          try { recognizer.stop(); } catch (_) {}
+          recognizer = null;
+        } else {
+          // Якщо браузер без мікрофона/STT — демонструємо тестовий голосовий запит
+          handleQuery('Рафаїль, доповідай біометричний статус групи.');
+        }
+      }
+
+      pttBtn.addEventListener('mousedown', startPttListening);
+      window.addEventListener('mouseup', stopPttListening);
+      pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startPttListening(); });
+      window.addEventListener('touchend', stopPttListening);
+
+      // Підтримка клавіші Пробіл для PTT (поза полями вводу)
+      window.addEventListener('keydown', (e) => {
+        const tag = (document.activeElement?.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+        if (e.code === 'Space' && !e.repeat) {
+          e.preventDefault();
+          startPttListening();
+        }
+      });
+      window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space' && pttActive) {
+          e.preventDefault();
+          stopPttListening();
+        }
+      });
+
+      // Письмові запити та швидкі тести
+      sendBtn.addEventListener('click', () => {
+        const val = textInput.value;
+        textInput.value = '';
+        handleQuery(val);
+      });
+      textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          sendBtn.click();
+        }
+      });
+
+      document.querySelectorAll('[data-quick]').forEach((btn) => {
+        btn.addEventListener('click', () => handleQuery(btn.getAttribute('data-quick')));
+      });
+
+      document.getElementById('btn-clear-log').addEventListener('click', () => {
+        dialogueLogEl.innerHTML = '';
+      });
+
+      document.getElementById('btn-export-irminsul').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(sessionJournal, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sessionJournal.sessionId}_irminsul.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+
+      // 6. 60 FPS РЕНДЕРИНГ КВАНТОВОЇ СФЕРИ (<canvas id="raphael-sphere">)
+      const canvas = document.getElementById('raphael-sphere');
+      const ctx = canvas.getContext('2d');
+      const particles = [];
+      const PARTICLE_COUNT = 110;
+      const goldenRatio = (1 + Math.sqrt(5)) / 2;
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const theta = (2 * Math.PI * i) / goldenRatio;
+        const phi = Math.acos(1 - (2 * (i + 0.5)) / PARTICLE_COUNT);
+        const ringLayer = i % 2 === 0 ? 1.0 : 0.78;
+        particles.push({
+          bx: ringLayer * Math.sin(phi) * Math.cos(theta),
+          by: ringLayer * Math.sin(phi) * Math.sin(theta),
+          bz: ringLayer * Math.cos(phi),
+          color: i % 3 === 0 ? '#10b981' : '#22d3ee',
+          phase: Math.random() * Math.PI * 2,
+          size: 1.4 + (i % 3) * 0.65
+        });
+      }
+
+      let rotY = 0;
+      let rotX = 0;
+      let hexAngle = 0;
+
+      function renderQuantumSphere(now) {
+        const W = canvas.width;
+        const H = canvas.height;
+        const cx = W / 2;
+        const cy = H / 2;
+        const t = now * 0.001;
+
+        ctx.clearRect(0, 0, W, H);
+
+        let speed = 0.007;
+        let baseRadius = 128;
+        let jitter = 0.04;
+        let hexAlpha = 0.35;
+
+        if (state.fsm === 'DORMANT') {
+          speed = 0.0015;
+          baseRadius = 92;
+          hexAlpha = 0.12;
+        } else if (state.fsm === 'LISTENING') {
+          // Частки звужуються до центру (фокусування уваги)
+          speed = 0.016;
+          baseRadius = 98 + Math.sin(t * 7) * 5;
+          jitter = 0.025;
+          hexAlpha = 0.65;
+        } else if (state.fsm === 'THINKING') {
+          // Прискорене хаотичне мерехтіння з інтерференційними хвилями
+          speed = 0.045;
+          baseRadius = 118 + Math.sin(t * 18) * 6;
+          jitter = 0.14;
+          hexAlpha = 0.8;
+        } else if (state.fsm === 'SPEAKING') {
+          // 60 FPS пульсація в такт звуковим хвилям Рафаїла
+          speed = 0.02;
+          baseRadius = 128 + state.voiceEnergy * 42;
+          jitter = 0.08 + state.voiceEnergy * 0.15;
+          hexAlpha = 0.5 + state.voiceEnergy * 0.45;
+        } else {
+          baseRadius = 125 + Math.sin(t * 2) * 4;
+        }
+
+        rotY += speed;
+        rotX += speed * 0.6;
+        hexAngle += speed * 1.4;
+
+        // 1. Центральне гексагональне ядро
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(hexAngle);
+        ctx.strokeStyle = state.fsm === 'DORMANT'
+          ? `rgba(239, 68, 68, ${hexAlpha})`
+          : `rgba(34, 211, 238, ${hexAlpha})`;
+        ctx.lineWidth = 1.4;
+
+        const hexRadius = 36 + state.voiceEnergy * 18;
+        for (let ring = 1; ring <= 2; ring++) {
+          const r = hexRadius * (ring * 0.65);
+          ctx.beginPath();
+          for (let k = 0; k < 6; k++) {
+            const ang = (Math.PI / 3) * k;
+            const hx = r * Math.cos(ang);
+            const hy = r * Math.sin(ang);
+            if (k === 0) ctx.moveTo(hx, hy);
+            else ctx.lineTo(hx, hy);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // 2. Проєкція та рендеринг подвійного кільця часток (#22d3ee та #10b981)
+        const cosY = Math.cos(rotY);
+        const sinY = Math.sin(rotY);
+        const cosX = Math.cos(rotX);
+        const sinX = Math.sin(rotX);
+
+        const projected = [];
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          const wave = 1 + Math.sin(t * 3.5 + p.phase) * jitter;
+          const x0 = p.bx * wave;
+          const y0 = p.by * wave;
+          const z0 = p.bz * wave;
+
+          const x1 = x0 * cosY - z0 * sinY;
+          const z1 = z0 * cosY + x0 * sinY;
+          const y2 = y0 * cosX - z1 * sinX;
+          const z2 = z1 * cosX + y0 * sinX;
+
+          const persp = 2.6 / (2.6 - z2 * 0.75);
+          projected.push({
+            px: cx + x1 * baseRadius * persp,
+            py: cy + y2 * baseRadius * persp,
+            z: z2,
+            size: p.size * persp * (1 + state.voiceEnergy * 0.5),
+            color: state.fsm === 'DORMANT' ? '#ef4444' : p.color
+          });
+        }
+
+        // Тонкі синаптичні зв'язки між сусідніми частками
+        ctx.lineWidth = 0.7;
+        for (let i = 0; i < projected.length; i++) {
+          const a = projected[i];
+          let links = 0;
+          for (let j = i + 1; j < projected.length; j++) {
+            const b = projected[j];
+            const dx = a.px - b.px;
+            const dy = a.py - b.py;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < 1350) {
+              const alpha = (1 - distSq / 1350) * (state.fsm === 'DORMANT' ? 0.15 : 0.38);
+              ctx.strokeStyle = state.fsm === 'DORMANT'
+                ? `rgba(239, 68, 68, ${alpha})`
+                : `rgba(34, 211, 238, ${alpha})`;
+              ctx.beginPath();
+              ctx.moveTo(a.px, a.py);
+              ctx.lineTo(b.px, b.py);
+              ctx.stroke();
+              if (++links >= 3) break;
+            }
+          }
+        }
+
+        // Самі частки
+        for (let i = 0; i < projected.length; i++) {
+          const pt = projected[i];
+          ctx.globalAlpha = Math.max(0.2, Math.min(1, (pt.z + 1.2) / 2.0));
+          ctx.fillStyle = pt.color;
+          ctx.beginPath();
+          ctx.arc(pt.px, pt.py, pt.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.globalAlpha = 1.0;
+
+        requestAnimationFrame(renderQuantumSphere);
+      }
+
+      requestAnimationFrame(renderQuantumSphere);
+    })();
+  </script>
+
+  <!-- ТОЧКИ ПІДКЛЮЧЕННЯ МОДУЛІВ РАФАЇЛА (ФАЗИ 1–5 ТЗ) -->
+  <!-- <script src="entropia_bridge.js"></script> -->
+  <!-- <script src="raphael_optimizer.js"></script> -->
+  <!-- <script src="raphael_canvas.js"></script> -->
+  <!-- <script src="raphael_voice.js"></script> -->
+  <!-- <script src="raphael_brain.js"></script> -->
+  <!-- <script src="raphael_core.js"></script> -->
+</body>
+</html>

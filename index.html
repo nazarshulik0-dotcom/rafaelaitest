@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>РАФАЇЛЬ // Hybrid Voice (A+B=C) + Rust WASM + Groq</title>
+  <style>
+    :root {
+      --bg-deep: #04070b;
+      --bg-panel: rgba(9, 15, 23, 0.92);
+      --cyan: #22d3ee;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --crimson: #ef4444;
+      --purple: #a855f7;
+      --text-main: #e2e8f0;
+      --text-dim: #94a3b8;
+      --border-glow: rgba(34, 211, 238, 0.32);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: radial-gradient(circle at 50% 35%, #081824 0%, #04070b 72%);
+      color: var(--text-main);
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 11px 22px;
+      background: rgba(5, 10, 16, 0.96);
+      border-bottom: 1px solid var(--border-glow);
+    }
+
+    .brand-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .status-pill {
+      padding: 4px 11px;
+      border-radius: 999px;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(34, 211, 238, 0.14);
+      border: 1px solid var(--cyan);
+      color: #a5f3fc;
+    }
+
+    .command-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 350px 1fr 460px;
+      gap: 16px;
+      padding: 16px 20px;
+      max-width: 1760px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1180px) {
+      .command-grid { grid-template-columns: 1fr; }
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--cyan);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 12px;
+    }
+
+    .field-label {
+      color: var(--text-dim);
+      font-size: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    select,
+    textarea {
+      width: 100%;
+      background: #04080e !important;
+      border: 1px solid rgba(34, 211, 238, 0.36);
+      border-radius: 8px;
+      padding: 8px 11px;
+      color: #f1f5f9 !important;
+      font-size: 12.5px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.28);
+    }
+
+    .btn {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.55);
+      color: #a7f3d0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      user-select: none;
+    }
+
+    .btn:hover:not(:disabled) {
+      background: rgba(16, 185, 129, 0.28);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-cyan {
+      background: rgba(34, 211, 238, 0.16);
+      border-color: rgba(34, 211, 238, 0.65);
+      color: #a5f3fc;
+    }
+
+    .btn-amber {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: rgba(245, 158, 11, 0.65);
+      color: #fde68a;
+    }
+
+    .btn-mic {
+      background: rgba(239, 68, 68, 0.16);
+      border-color: rgba(239, 68, 68, 0.65);
+      color: #fecaca;
+    }
+
+    .btn-mic.recording {
+      background: rgba(239, 68, 68, 0.45);
+      border-color: #ef4444;
+      color: #ffffff;
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.75);
+      animation: pulseMic 1s infinite alternate;
+    }
+
+    @keyframes pulseMic {
+      from { transform: scale(1); }
+      to { transform: scale(1.03); }
+    }
+
+    .center-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sphere-viewport {
+      position: relative;
+      width: 100%;
+      height: 340px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 48%, rgba(8, 51, 68, 0.42) 0%, rgba(5, 10, 16, 0.25) 68%, transparent 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      overflow: hidden;
+    }
+
+    #raphael-canvas {
+      width: 340px;
+      height: 340px;
+      max-width: 100%;
+      cursor: crosshair;
+    }
+
+    .stage-bar {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+      padding: 7px 10px;
+      background: rgba(4, 12, 20, 0.9);
+      border: 1px solid rgba(34, 211, 238, 0.32);
+      border-radius: 10px;
+      width: 100%;
+    }
+
+    .stage-btn {
+      flex: 1;
+      padding: 6px 9px;
+      border-radius: 7px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #94a3b8;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .stage-btn.active {
+      color: #ecfeff;
+      background: rgba(34, 211, 238, 0.22);
+      border-color: var(--cyan);
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.5);
+      font-weight: 700;
+    }
+
+    .stage-btn.manas.active {
+      color: #fef3c7;
+      background: rgba(245, 158, 11, 0.25);
+      border-color: var(--amber);
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.6);
+    }
+
+    .dialogue-log {
+      flex: 1;
+      min-height: 290px;
+      max-height: 360px;
+      overflow-y: auto;
+      background: rgba(3, 8, 13, 0.92);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 10px;
+      padding: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      font-size: 12.5px;
+    }
+
+    .log-entry {
+      padding: 9px 11px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.82);
+      border-left: 3px solid var(--cyan);
+      line-height: 1.48;
+      word-break: break-word;
+    }
+
+    .log-entry.user {
+      border-left-color: var(--emerald);
+      background: rgba(6, 78, 59, 0.28);
+    }
+
+    .log-entry.error {
+      border-left-color: var(--crimson);
+      background: rgba(127, 29, 29, 0.35);
+      color: #fecaca;
+      font-family: monospace;
+    }
+
+    .log-entry.sarcasm {
+      border-left-color: var(--amber);
+      background: rgba(120, 53, 15, 0.32);
+      color: #fde68a;
+    }
+
+    .voice-slot-box {
+      background: rgba(4, 10, 18, 0.88);
+      border: 1px dashed rgba(34, 211, 238, 0.35);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="top-bar">
+    <div class="brand-title">
+      <span>💠 РАФАЇЛЬ // ГІБРИДНИЙ ГОЛОС (ВАРІАНТ В: ПРЕ-РЕНДЕР + AI SYNTH + RUST DSP)</span>
+      <span id="wasm-status-badge" style="font-size:11px;color:#fbbf24;">[⏳ Завантаження raphael_wasm...]</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:11px;color:var(--text-dim);">Аудіо-контур:</span>
+      <span id="voice-status-pill" class="status-pill">DSP APEX READY</span>
+    </div>
+  </header>
+
+  <main class="command-grid">
+
+    <!-- ЛІВА КОЛОНКА: КОНТЕКСТ ГРАВЦЯ, ЕХОЛОКАЦІЯ ТА БАНК ВЛАСНИХ ЗАПИСІВ -->
+    <section class="panel">
+      <div class="panel-header">
+        <span>🧬 Контекст Суб'єкта & Ірмінсуль</span>
+        <span id="role-badge" style="color:var(--emerald);">GM MODE</span>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label"><span>Роль доступу:</span><span>Позивний:</span></label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <select id="ctx-role">
+            <option value="gm">👑 Архітектор (GM)</option>
+            <option value="player">👤 Гравець</option>
+          </select>
+          <input type="text" id="ctx-callsign" value="Сокіл" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">
+          <span>Біометрія (HP):</span>
+          <strong id="ctx-hp-label" style="color:var(--emerald);">85 / 100 HP (85%)</strong>
+        </label>
+        <input type="range" id="ctx-hp" min="5" max="100" value="85" style="accent-color:var(--emerald);cursor:pointer;" />
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Поточний сектор Ковчега:</label>
+        <select id="ctx-sector">
+          <option value="Сектор I: Карантинні Сади">Сектор I: Карантинні Сади (Відкрито)</option>
+          <option value="Оранжерея №3 (Біокупол)">Оранжерея №3 (Відкрито)</option>
+          <option value="Сектор II: Заблокований Купол">[КАРАНТИН] Сектор II</option>
+          <option value="Сектор 0: Ядро Сіель">[КАРАНТИН] Сектор 0: Ядро Сіель</option>
+        </select>
+      </div>
+
+      <div class="panel-header" style="margin-top:2px;">
+        <span>📡 Двокрокова Ехолокація (Карта)</span>
+        <span style="color:#67e8f9;">STAGE 1</span>
+      </div>
+
+      <div class="field-group">
+        <div id="map-glyph-card" style="padding:8px;border-radius:8px;background:rgba(4,12,20,0.9);border:1px dashed var(--cyan);font-family:monospace;font-size:12px;color:#67e8f9;">
+          Маркер на Карті: <b id="glyph-title">░▒▓ ŦĦΞ ◈ S1-404</b>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;">
+          <button type="button" id="btn-echo-step1" class="btn btn-cyan">1. Запит розшифровки</button>
+          <button type="button" id="btn-echo-step2" class="btn" disabled>2. Підтвердити («Так»)</button>
+        </div>
+      </div>
+
+      <div class="panel-header" style="margin-top:2px;">
+        <span>🌳 Пам'ять «Ірмінсуля» (RAG без спойлерів)</span>
+      </div>
+      <textarea id="irminsul-rag-data" rows="3">• Люмінесцентний плющ Вавилонії: біолюмінесцентна флора Сектору I, безпечна при контакті, поглинає токсичні спори.
+• Оранжерея №3: центральний ботанічний купол Карантинних Садів, де розташовано Маяк Архангела I (Рафаїла).</textarea>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <button type="button" id="btn-trigger-awakening" class="btn btn-cyan" title="Трифазна ініціалізація: Neo-Babylonian -> English -> Ukrainian">
+          ⚡ 3-Фазне Пробудження
+        </button>
+        <button type="button" id="btn-trigger-sarcasm" class="btn btn-amber">
+          😏 Сарказм Рафаїла
+        </button>
+      </div>
+    </section>
+
+    <!-- ЦЕНТРАЛЬНА КОЛОНКА: RUST WASM ВІЗУАЛІЗАТОР + МІКРОФОН (WHISPER TURBO) -->
+    <section class="panel center-stage">
+      <div class="panel-header" style="width:100%;">
+        <span>🌐 Квантовий Аватар (Rust WASM 1800 частинок + Audio DSP)</span>
+        <span id="fps-counter" style="font-family:monospace;color:var(--emerald);">60 FPS</span>
+      </div>
+
+      <div class="sphere-viewport">
+        <canvas id="raphael-canvas" width="420" height="420"></canvas>
+      </div>
+
+      <div class="stage-bar">
+        <div class="stage-btn" data-evol="0">0. DORMANT (Сплячий)</div>
+        <div class="stage-btn active" data-evol="1">1. ACTIVE (Квантова Сфера)</div>
+        <div class="stage-btn manas" data-evol="2">2. MANAS (Гуманоїдний Бюст 9/9)</div>
+      </div>
+
+      <div style="width:100%;display:flex;flex-direction:column;gap:8px;">
+        <!-- РЯДОК ВВОДУ + МІКРОФОН GROQ WHISPER TURBO -->
+        <div style="display:flex;gap:7px;">
+          <button type="button" id="btn-mic-toggle" class="btn btn-mic" style="padding:0 14px;white-space:nowrap;" title="Голосове введення через Rust VAD + Groq Whisper Large v3 Turbo">
+            🎙️ Говорити
+          </button>
+          <input
+            type="text"
+            id="raphael-query-input"
+            autocomplete="off"
+            placeholder="Говори в мікрофон або пиши сюди..."
+          />
+          <button type="button" id="btn-send-query" class="btn btn-cyan" style="padding:0 18px;white-space:nowrap;">
+            ⚡ Відправити
+          </button>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <button type="button" class="btn" data-quick="Привіт, Рафаїле! Хто ти і де ми зараз перебуваємо?">
+            👋 Хто ти і де ми?
+          </button>
+          <button type="button" class="btn" data-quick="Що тобі відомо про люмінесцентний плющ та Оранжерею №3?">
+            🌿 Питання по Сектору I
+          </button>
+          <button type="button" class="btn" data-quick="А давай ми просто стрибнемо в шахту реактора без страховки?">
+            🎲 Божевільний план гравців
+          </button>
+          <button type="button" class="btn" data-quick="Розкажи, що приховано у Секторі 0 і де лежить Ядро Сіель?">
+            🔒 Перевірка карантину Сіель
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ПРАВА КОЛОНКА: ДІАЛОГ + ГІБРИДНИЙ ГОЛОСОВИЙ МОДУЛЬ (ВАРІАНТ В: А + Б) -->
+    <section class="panel">
+      <div class="panel-header">
+        <span>💬 Журнал Зв'язку з Рафаїлом</span>
+        <div style="display:flex;gap:6px;">
+          <button type="button" id="btn-stop-audio" class="btn" style="padding:2px 8px;font-size:10px;border-color:var(--crimson);color:#fca5a5;">⏹ Стоп звук</button>
+          <button type="button" id="btn-clear-chat" class="btn" style="padding:2px 8px;font-size:10px;">Очистити</button>
+        </div>
+      </div>
+
+      <div id="dialogue-log" class="dialogue-log"></div>
+
+      <!-- ГІБРИДНИЙ ГОЛОСОВИЙ КОНТУР (ВАРІАНТ В = СВОЇ ЗАПИСИ + ДИНАМІЧНИЙ AI СИНТЕЗ) -->
+      <div class="panel-header">
+        <span>🔊 Гібридне Ядро Голосу (Варіант В: Пре-рендер + AI Synth)</span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10.5px;color:#a7f3d0;">
+          <input type="checkbox" id="chk-auto-speak" checked /> Авто-озвучка
+        </label>
+      </div>
+
+      <div class="field-group">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div>
+            <label class="field-label">Тембр живого AI-синтезатора:</label>
+            <select id="voice-profile-select">
+              <option value="onyx">💠 Onyx (Глибокий спокійний Apex)</option>
+              <option value="ash">⚡ Ash (Аналітичний баритон)</option>
+              <option value="echo">🌌 Echo (М'який голографічний)</option>
+              <option value="sage">🔮 Sage (Конструктивний Манас)</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Обробка Rust WASM DSP:</label>
+            <select id="dsp-mode-select">
+              <option value="apex">🎛️ Apex Stereo Doubler (Увімкнено)</option>
+              <option value="clean">🔈 Clean Studio (Без ефектів)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- СЛОТ ДЛЯ ЗАВАНТАЖЕННЯ ВЛАСНИХ ЗАПИСАНИХ ФАЙЛІВ (ЧАСТИНА «А») -->
+      <div class="voice-slot-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="color:var(--cyan);font-weight:700;">📂 Банк твоїх пре-рендерених фраз (MP3 / WAV з REAPER):</span>
+          <span id="custom-clips-count" style="color:var(--emerald);font-family:monospace;">0 завантажено</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;">
+          <select id="custom-slot-target" style="padding:5px 8px;font-size:11px;">
+            <option value="sarcasm">Слот: 😏 Саркастична репліка</option>
+            <option value="echo_ask">Слот: 📡 Ехолокація (Крок 1 — Запит)</option>
+            <option value="echo_done">Слот: 🟢 Ехолокація (Крок 2 — Розшифровано)</option>
+            <option value="quarantine">Слот: 🔒 Блокування Карантину Сіель</option>
+            <option value="awakening_uk">Слот: ⚡ Пробудження (Українська фаза)</option>
+          </select>
+          <label class="btn btn-cyan" style="padding:5px 10px;font-size:11px;margin:0;">
+            📥 Обрати файл
+            <input type="file" id="custom-audio-file" accept="audio/*" style="display:none;" />
+          </label>
+          <button type="button" id="btn-test-slot" class="btn" style="padding:5px 10px;font-size:11px;">▶️ Тест</button>
+        </div>
+      </div>
+
+      <!-- МОДЕЛЬ GROQ ТА ПАРОЛЬ АРХІТЕКТОРА -->
+      <div style="display:grid;grid-template-columns:1fr 130px;gap:6px;margin-top:2px;">
+        <select id="groq-model-select" title="Активна текстова модель Groq">
+          <option value="auto">🔄 Авто-підбір моделі Groq...</option>
+        </select>
+        <input
+          type="password"
+          id="master-pass-input"
+          autocomplete="new-password"
+          placeholder="Пароль..."
+          value="vitruvius"
+          title="Пароль Архітектора для розшифровки ключа Groq"
+        />
+      </div>
+      <div id="groq-status-pill" style="font-family:monospace;font-size:10.5px;color:var(--emerald);text-align:right;">
+        GROQ CLOUD + WHISPER TURBO READY
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module">
+    // =========================================================================
+    // 1. ВБУДОВАНИЙ ЗАШИФРОВАНИЙ ВЕКТОР GROQ API
+    // =========================================================================
+    const ENCRYPTED_GROQ_VECTOR = [
+      82, 248, 128, 156, 63, 72, 25, 42, 23, 133, 187, 236, 50, 19, 1, 198,
+      187, 33, 106, 40, 250, 153, 20, 70, 32, 126, 214, 20, 90, 212, 174, 241,
+      231, 108, 218, 105, 226, 65, 75, 159, 255, 23, 43, 143, 103, 185, 196, 133,
+      228, 45, 143, 24, 200, 61, 24, 250, 175, 242
+    ];
+
+    const SARCASM_POOL = [
+      'Аналіз: шанс успішного результату — 1.4%. Вельми оригінально, суб\'єкте.',
+      'Цікава гіпотеза. Якщо ваша мета — прискорена деконструкція власного організму, план бездоганний.',
+      'Зафіксовано спробу обійти базові закони фізики. Рекомендую переглянути тактику.',
+      'Обчислення завершено: імовірність виживання при такому маневрі прямує до статистичної похибки.'
+    ];
+
+    const FORBIDDEN_QUARANTINE = [
+      /сектор[ауіом]?\s*(?:ii|iii|iv|v|vi|vii|viii|2|3|4|5|6|7|8|0|нуль)\b/i,
+      /ядр[оауі]\s*сіель|\bсіель\b|\bсиель\b|\bciel\b/i,
+      /причин[аиу]\s*катастроф|хто\s*знищив\s*ковчег|коди\s*архангел|кубяк/i
+    ];
+
+    // Шляхи за замовчуванням у репозиторії (якщо ти покладеш файли в ./assets/audio/raphael/)
+    const REPO_AUDIO_PATHS = {
+      sarcasm: './assets/audio/raphael/sarcasm_01.mp3',
+      echo_ask: './assets/audio/raphael/echo_handshake_ask.mp3',
+      echo_done: './assets/audio/raphael/echo_decrypt_done.mp3',
+      quarantine: './assets/audio/raphael/fail_safe_block.mp3',
+      awakening_nb: './assets/audio/raphael/init_01_neobabylon.mp3',
+      awakening_en: './assets/audio/raphael/init_02_english.mp3',
+      awakening_uk: './assets/audio/raphael/init_03_ukrainian.mp3'
+    };
+
+    // =========================================================================
+    // 2. ДЕШИФРАТОР КЛЮЧА GROQ В ОПЕРАТИВНІЙ ПАМ'ЯТІ
+    // =========================================================================
+    function deriveKeyStreamSeed(password) {
+      const cleanPass = String(password || 'vitruvius').trim();
+      let h1 = 0x811c9dc5;
+      let h2 = 0xcbf29ce4;
+      for (let round = 0; round < 512; round++) {
+        for (let i = 0; i < cleanPass.length; i++) {
+          const ch = cleanPass.charCodeAt(i);
+          h1 ^= (ch + round) & 0xff;
+          h1 = Math.imul(h1, 0x01000193) >>> 0;
+          h2 ^= (ch ^ round) & 0xff;
+          h2 = Math.imul(h2, 0x5bd1e995) >>> 0;
+        }
+      }
+      return [h1 >>> 0, h2 >>> 0];
+    }
+
+    function nextStreamByte(state, idx) {
+      let s0 = (state[0] + Math.imul(idx + 1, 0x9e3779b9)) >>> 0;
+      let s1 = (state[1] ^ s0) >>> 0;
+      s0 = Math.imul(s0 ^ (s0 >>> 16), 0x85ebca6b) >>> 0;
+      s1 = Math.imul(s1 ^ (s1 >>> 13), 0xc2b2ae35) >>> 0;
+      state[0] = s0;
+      state[1] = s1;
+      return ((s0 ^ s1) >>> 0) & 0xff;
+    }
+
+    function decryptGroqKey(encryptedArray, masterPassword) {
+      if (!Array.isArray(encryptedArray) || encryptedArray.length <= 2) return '';
+      const state = deriveKeyStreamSeed(masterPassword);
+      const expectedTag0 = (state[0] >>> 16) & 0xff;
+      const expectedTag1 = (state[1] >>> 16) & 0xff;
+      if (encryptedArray[0] !== expectedTag0 || encryptedArray[1] !== expectedTag1) return null;
+
+      let out = '';
+      for (let i = 2; i < encryptedArray.length; i++) {
+        const mask = nextStreamByte(state, i - 2);
+        out += String.fromCharCode(encryptedArray[i] ^ mask);
+      }
+      return out.trim();
+    }
+
+    // =========================================================================
+    // 3. ІНІЦІАЛІЗАЦІЯ RUST WASM ТА ВІЗУАЛІЗАТОРА (СФЕРА <-> МАНАС)
+    // =========================================================================
+    const canvas = document.getElementById('raphael-canvas');
+    const ctx2d = canvas.getContext('2d');
+    const wasmBadge = document.getElementById('wasm-status-badge');
+    const voiceStatusPill = document.getElementById('voice-status-pill');
+    const fpsCounter = document.getElementById('fps-counter');
+    const groqStatusPill = document.getElementById('groq-status-pill');
+    const modelSelect = document.getElementById('groq-model-select');
+
+    let wasmEngine = null;
+    let currentEvolution = 1; // 0 = Dormant, 1 = Active Sphere, 2 = Manas Bust
+    let pointer = { x: 0, y: 0 };
+    let lastFrameTime = performance.now();
+    let unlockedGroqKey = decryptGroqKey(ENCRYPTED_GROQ_VECTOR, 'vitruvius') || '';
+    let availableGroqModels = [];
+    let chatHistory = [];
+
+    // =========================================================================
+    // 4. ГІБРИДНИЙ АУДІО-РУШІЙ (ВАРІАНТ В: ПРЕ-РЕНДЕР + AI SYNTH + RUST DSP)
+    // =========================================================================
+    let audioCtx = null;
+    let activeAudioSource = null;
+    let customAudioBuffers = {}; // Зберігає завантажені тобою WAV/MP3 у пам'яті
+
+    function ensureAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function stopCurrentAudio() {
+      if (activeAudioSource) {
+        try { activeAudioSource.stop(); } catch (_) {}
+        activeAudioSource = null;
+      }
+      if (wasmEngine) {
+        wasmEngine.set_voice_energy(0.0);
+        wasmEngine.set_activity_mode(0);
+      }
+      voiceStatusPill.textContent = 'DSP APEX READY';
+    }
+
+    // Короткий двонотний акустичний сигнал перед реплікою (як на 00:22 у відео Apex)
+    function playApexCueChime() {
+      try {
+        const ctx = ensureAudioContext();
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(680, now + 0.09);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.06, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } catch (_) {}
+    }
+
+    // Пропускає будь-який AudioBuffer (твій MP3 або згенерований ШІ) через Rust WASM DSP-даблер
+    async function playAudioBufferWithRustDSP(sourceBuffer, label = 'SPEAKING') {
+      stopCurrentAudio();
+      const ctx = ensureAudioContext();
+
+      // Клонуємо буфер, щоб Rust DSP модифікував копію
+      const workingBuffer = ctx.createBuffer(
+        sourceBuffer.numberOfChannels,
+        sourceBuffer.length,
+        sourceBuffer.sampleRate
+      );
+      for (let ch = 0; ch < sourceBuffer.numberOfChannels; ch++) {
+        workingBuffer.copyToChannel(sourceBuffer.getChannelData(ch), ch);
+      }
+
+      const dspMode = document.getElementById('dsp-mode-select').value;
+      const primaryChannel = workingBuffer.getChannelData(0);
+
+      // Якщо обрано режим Apex Stereo Doubler — обробляємо буфер у Rust WASM
+      if (wasmEngine && dspMode === 'apex') {
+        const chunk = 2048;
+        for (let i = 0; i < primaryChannel.length; i += chunk) {
+          const sub = primaryChannel.subarray(i, Math.min(i + chunk, primaryChannel.length));
+          wasmEngine.process_voice_dsp(sub, workingBuffer.sampleRate);
+        }
+      }
+
+      // Створюємо аналізатор для живої реакції частинок Сфери/Манаса в реальному часі
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      const timeData = new Float32Array(analyser.fftSize);
+
+      const src = ctx.createBufferSource();
+      src.buffer = workingBuffer;
+      src.connect(analyser);
+      analyser.connect(ctx.destination);
+
+      activeAudioSource = src;
+      voiceStatusPill.textContent = `🔊 ${label}`;
+      if (wasmEngine) wasmEngine.set_activity_mode(4); // Speaking
+
+      let isPlaying = true;
+      function updateVoiceReactiveParticles() {
+        if (!isPlaying || activeAudioSource !== src) return;
+        analyser.getFloatTimeDomainData(timeData);
+        let sum = 0;
+        for (let i = 0; i < timeData.length; i++) {
+          sum += timeData[i] * timeData[i];
+        }
+        const rms = Math.sqrt(sum / timeData.length);
+        if (wasmEngine) {
+          wasmEngine.set_voice_energy(Math.min(1.3, rms * 5.2));
+        }
+        requestAnimationFrame(updateVoiceReactiveParticles);
+      }
+
+      return new Promise((resolve) => {
+        src.onended = () => {
+          isPlaying = false;
+          if (activeAudioSource === src) activeAudioSource = null;
+          if (wasmEngine) {
+            wasmEngine.set_voice_energy(0.0);
+            wasmEngine.set_activity_mode(0);
+          }
+          voiceStatusPill.textContent = 'DSP APEX READY';
+          resolve(true);
+        };
+        src.start(0);
+        requestAnimationFrame(updateVoiceReactiveParticles);
+      });
+    }
+
+    // Головна функція озвучення «Варіант В (А + Б)»:
+    // 1. Спочатку перевіряє, чи є твій завантажений пре-рендер для цього слоту (Частина А).
+    // 2. Потім перевіряє, чи лежить MP3 у папці ./assets/audio/raphael/ (Частина А).
+    // 3. Якщо це довільна відповідь ШІ — генерує живий голос у моменті й пропускає через Rust DSP (Частина Б).
+    async function speakHybridRaphael(text, slotKey = null, langHint = 'uk') {
+      const autoSpeak = document.getElementById('chk-auto-speak').checked;
+      if (!autoSpeak && !slotKey) return;
+
+      playApexCueChime();
+
+      // А1. Перевірка завантаженого тобою файлу в слоті
+      if (slotKey && customAudioBuffers[slotKey]) {
+        await playAudioBufferWithRustDSP(customAudioBuffers[slotKey], `CUSTOM SLOT [${slotKey}]`);
+        return;
+      }
+
+      // А2. Перевірка статичного MP3 у репозиторії ./assets/audio/raphael/
+      if (slotKey && REPO_AUDIO_PATHS[slotKey]) {
+        try {
+          const res = await fetch(REPO_AUDIO_PATHS[slotKey]);
+          if (res.ok) {
+            const arr = await res.arrayBuffer();
+            const ctx = ensureAudioContext();
+            const decoded = await ctx.decodeAudioData(arr);
+            await playAudioBufferWithRustDSP(decoded, `REPO MP3 [${slotKey}]`);
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // Б1. Якщо це англійська фраза (наприклад, Фаза 2 пробудження) — пробуємо нативний Groq PlayAI TTS
+      const pass = document.getElementById('master-pass-input').value.trim() || 'vitruvius';
+      const activeKey = decryptGroqKey(ENCRYPTED_GROQ_VECTOR, pass) || unlockedGroqKey;
+
+      if (langHint === 'en' && activeKey) {
+        try {
+          const groqTtsRes = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${activeKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: 'playai-tts',
+              input: text,
+              voice: 'Angelo-PlayAI',
+              response_format: 'wav'
+            })
+          });
+          if (groqTtsRes.ok) {
+            const wavBuf = await groqTtsRes.arrayBuffer();
+            const ctx = ensureAudioContext();
+            const decoded = await ctx.decodeAudioData(wavBuf);
+            await playAudioBufferWithRustDSP(decoded, 'GROQ PLAYAI TTS');
+            return;
+          }
+        } catch (_) {}
+      }
+
+      // Б2. Живий генератор українських відповідей у моменті (OpenAI Audio Stream -> Rust WASM DSP)
+      const voiceProfile = document.getElementById('voice-profile-select').value || 'onyx';
+      try {
+        voiceStatusPill.textContent = `⏳ SYNTH (${voiceProfile.toUpperCase()})...`;
+        const cleanText = String(text || '').replace(/\[.*?\]/g, '').trim();
+        if (!cleanText) return;
+
+        const ttsUrl = `https://text.pollinations.ai/${encodeURIComponent(cleanText)}?model=openai-audio&voice=${encodeURIComponent(voiceProfile)}`;
+        const res = await fetch(ttsUrl);
+        if (res.ok) {
+          const audioBytes = await res.arrayBuffer();
+          if (audioBytes.byteLength > 500) {
+            const ctx = ensureAudioContext();
+            const decodedBuffer = await ctx.decodeAudioData(audioBytes);
+            await playAudioBufferWithRustDSP(decodedBuffer, `AI SYNTH [${voiceProfile.toUpperCase()}]`);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Dynamic AI audio stream fallback:', e);
+      }
+
+      // Якщо мережевий аудіопотік недоступний — імітуємо пульсацію сфери під текст
+      if (wasmEngine) {
+        wasmEngine.set_voice_energy(0.8);
+        setTimeout(() => wasmEngine.set_voice_energy(0.0), 1500);
+      }
+      voiceStatusPill.textContent = 'DSP APEX READY';
+    }
+
+    // =========================================================================
+    // 5. МІКРОФОН: RUST WASM VAD + GROQ WHISPER LARGE V3 TURBO (СЛУХ РАФАЇЛА)
+    // =========================================================================
+    let isRecordingMic = false;
+    let mediaRecorder = null;
+    let micStream = null;
+    let recordedChunks = [];
+    let vadInterval = null;
+
+    const btnMic = document.getElementById('btn-mic-toggle');
+
+    async function toggleMicrophoneRecording() {
+      if (isRecordingMic) {
+        stopMicAndTranscribe();
+        return;
+      }
+
+      try {
+        stopCurrentAudio();
+        micStream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+        });
+
+        const ctx = ensureAudioContext();
+        const source = ctx.createMediaStreamSource(micStream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const pcmFrame = new Float32Array(analyser.fftSize);
+
+        if (wasmEngine) {
+          wasmEngine.reset_vad();
+          wasmEngine.set_activity_mode(2); // Listening
+        }
+
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(micStream);
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          clearInterval(vadInterval);
+          micStream?.getTracks().forEach((t) => t.stop());
+          isRecordingMic = false;
+          btnMic.classList.remove('recording');
+          btnMic.textContent = '🎙️ Говорити';
+
+          if (recordedChunks.length === 0) return;
+          const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+          await transcribeWithGroqWhisper(audioBlob);
+        };
+
+        mediaRecorder.start();
+        isRecordingMic = true;
+        btnMic.classList.add('recording');
+        btnMic.textContent = '🛑 Слухаю...';
+        voiceStatusPill.textContent = '🎙️ RUST VAD ACTIVE';
+
+        // Rust WASM перевіряє тишу кожні 60 мс і сам зупиняє запис після завершення фрази!
+        vadInterval = setInterval(() => {
+          if (!isRecordingMic) return;
+          analyser.getFloatTimeDomainData(pcmFrame);
+          if (wasmEngine) {
+            const decision = wasmEngine.process_mic_vad_frame(pcmFrame, 60.0);
+            if (decision === 2) { // VadDecision::SpeechEndedTriggerSend
+              stopMicAndTranscribe();
+            }
+          }
+        }, 60);
+      } catch (err) {
+        addLog('СИСТЕМА [МІКРОФОН]', `⚠️ Не вдалося увімкнути мікрофон: ${err.message}`, 'error');
+      }
+    }
+
+    function stopMicAndTranscribe() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+    }
+
+    async function transcribeWithGroqWhisper(audioBlob) {
+      const pass = document.getElementById('master-pass-input').value.trim() || 'vitruvius';
+      const activeKey = decryptGroqKey(ENCRYPTED_GROQ_VECTOR, pass) || unlockedGroqKey;
+      if (!activeKey) return;
+
+      voiceStatusPill.textContent = '⏳ WHISPER TURBO...';
+      try {
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'speech.webm');
+        formData.append('model', 'whisper-large-v3-turbo');
+        formData.append('language', 'uk');
+        formData.append('response_format', 'json');
+
+        const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${activeKey}` },
+          body: formData
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const recognizedText = (data?.text || '').trim();
+          if (recognizedText) {
+            await askRaphaelAI(recognizedText);
+            return;
+          }
+        }
+      } catch (err) {
+        addLog('СИСТЕМА [WHISPER]', `Помилка розпізнавання голосу: ${err.message}`, 'error');
+      }
+      voiceStatusPill.textContent = 'DSP APEX READY';
+    }
+
+    // =========================================================================
+    // 6. МОЗОК GROQ + АВТО-СКАНЕР МОДЕЛЕЙ
+    // =========================================================================
+    const logEl = document.getElementById('dialogue-log');
+
+    function addLog(author, text, type = 'ai') {
+      const div = document.createElement('div');
+      div.className = `log-entry ${type}`;
+      const time = new Date().toTimeString().split(' ')[0];
+      div.innerHTML = `<div style="font-size:10px;color:var(--text-dim);margin-bottom:3px;">[${time}] <b>${author}</b></div><div>${text}</div>`;
+      logEl.appendChild(div);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    async function discoverGroqModels(apiKey) {
+      if (!apiKey || !apiKey.startsWith('gsk_')) return [];
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/models', {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        const allIds = (data?.data || [])
+          .map((m) => m.id)
+          .filter((id) => !/whisper|guard|tts|playai|embed/i.test(id));
+
+        const priorityScore = (id) => {
+          const low = id.toLowerCase();
+          if (low.includes('llama-4')) return 100;
+          if (low.includes('70b')) return 95;
+          if (low.includes('qwen')) return 90;
+          if (low.includes('deepseek')) return 85;
+          if (low.includes('llama-3')) return 80;
+          return 50;
+        };
+
+        allIds.sort((a, b) => priorityScore(b) - priorityScore(a));
+        availableGroqModels = allIds;
+
+        if (allIds.length > 0) {
+          modelSelect.innerHTML = allIds
+            .map((id, idx) => `<option value="${id}">${idx === 0 ? '⭐ ' : ''}${id}</option>`)
+            .join('');
+          groqStatusPill.textContent = `ONLINE: ${allIds[0]} + WHISPER TURBO`;
+        }
+        return allIds;
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function checkFailSafe(queryText, sectorName) {
+      if (currentEvolution === 2) return false;
+      if (sectorName.includes('[КАРАНТИН]')) return true;
+      return FORBIDDEN_QUARANTINE.some((rx) => rx.test(queryText));
+    }
+
+    function buildSystemPrompt() {
+      const callsign = document.getElementById('ctx-callsign').value.trim() || 'Сокіл';
+      const hp = document.getElementById('ctx-hp').value;
+      const sector = document.getElementById('ctx-sector').value;
+      const rag = document.getElementById('irminsul-rag-data').value.trim();
+
+      const persona = currentEvolution === 2
+        ? 'Ти — «Манас Рафаїль», вища синтезована форма інтелекту Ковчега Вавилонії (9/9 маяків Архангелів синхронізовано з Ядром Сіель). Маєш власну волю, глибоку свідомість та легку інтелектуальну іронію.'
+        : 'Ти — «Рафаїль» (Вежа Архангела I), самосвідомий бортовий ШІ Ковчега Вавилонії (проєкт «Ентропія»). Говориш чистою, природною українською мовою, спокійно, розумно, лаконічно (1–2 речення), іноді з тонким сухим сарказмом.';
+
+      return [
+        persona,
+        'ПРАВИЛА: Не пиши звітів про HP, якщо не питають. Відповідай тільки чистою українською мовою без іноземних вставок та без тегів <think>.',
+        `Контекст: співрозмовник — ${callsign}, локація — ${sector}, біометрія — ${hp}%.`,
+        `Відкриті вузли Ірмінсуля:\n${rag}`
+      ].join('\n');
+    }
+
+    async function askRaphaelAI(userText) {
+      const query = String(userText || '').trim();
+      if (!query) return;
+
+      const callsign = document.getElementById('ctx-callsign').value.trim() || 'Сокіл';
+      const sector = document.getElementById('ctx-sector').value;
+
+      if (currentEvolution === 0) {
+        addLog('СИСТЕМА [DORMANT]', '[Термінал Архангела І перебуває у сплячому режимі. Увімкніть стан 1. ACTIVE під сферою.]', 'error');
+        return;
+      }
+
+      addLog(callsign, query, 'user');
+
+      // Перевірка Fail-Safe Сіель -> програє твій пре-рендерений файл карантину або озвучує відмову
+      if (checkFailSafe(query, sector)) {
+        if (wasmEngine) {
+          wasmEngine.set_activity_mode(5);
+          wasmEngine.trigger_glitch(1.0);
+        }
+        const blockMsg = 'Протокол карантину Сіель. Доступ до архівів цього сектора заблоковано директивою безпеки Ковчега.';
+        addLog('РАФАЇЛЬ [КАРАНТИН СІЕЛЬ]', `[${blockMsg}]`, 'error');
+        await speakHybridRaphael(blockMsg, 'quarantine', 'uk');
+        return;
+      }
+
+      if (wasmEngine) wasmEngine.set_activity_mode(3);
+
+      const pass = document.getElementById('master-pass-input').value.trim() || 'vitruvius';
+      const activeKey = decryptGroqKey(ENCRYPTED_GROQ_VECTOR, pass) || unlockedGroqKey;
+
+      if (availableGroqModels.length === 0) {
+        await discoverGroqModels(activeKey);
+      }
+
+      const selectedModel = modelSelect.value && modelSelect.value !== 'auto'
+        ? modelSelect.value
+        : (availableGroqModels[0] || 'llama-3.1-8b-instant');
+
+      const candidateQueue = [
+        selectedModel,
+        ...availableGroqModels.filter((m) => m !== selectedModel)
+      ];
+
+      const sysPrompt = buildSystemPrompt();
+      const t0 = performance.now();
+      let reply = '';
+      let usedModel = '';
+
+      for (let i = 0; i < candidateQueue.length; i++) {
+        const modelId = candidateQueue[i];
+        try {
+          const messages = [{ role: 'system', content: sysPrompt }];
+          chatHistory.slice(-8).forEach((turn) => {
+            messages.push({ role: 'user', content: turn.q });
+            messages.push({ role: 'assistant', content: turn.a });
+          });
+          messages.push({ role: 'user', content: query });
+
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            mode: 'cors',
+            credentials: 'omit',
+            headers: {
+              'Authorization': `Bearer ${activeKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: modelId,
+              messages,
+              temperature: 0.55,
+              max_tokens: 220
+            })
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (res.ok) {
+            let rawContent = (data?.choices?.[0]?.message?.content || '').trim();
+            rawContent = rawContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+            if (rawContent) {
+              reply = rawContent;
+              usedModel = modelId;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (!reply) {
+        addLog('СИСТЕМА [GROQ]', '⚠️ Помилка генерації відповіді.', 'error');
+        if (wasmEngine) wasmEngine.set_activity_mode(0);
+        return;
+      }
+
+      const ms = Math.round(performance.now() - t0);
+      const cleanReply = reply.replace(/\*\*|__/g, '').trim();
+      chatHistory.push({ q: query, a: cleanReply });
+      groqStatusPill.textContent = `${usedModel} • ${ms} мс`;
+
+      addLog(currentEvolution === 2 ? 'МАНАС РАФАЇЛЬ' : 'РАФАЇЛЬ', cleanReply, 'ai');
+      await speakHybridRaphael(cleanReply, null, 'uk');
+    }
+
+    // =========================================================================
+    // 7. ЗАВАНТАЖЕННЯ ВЛАСНИХ WAV/MP3 У СЛОТИ ТА ОБРОБНИКИ КНОПОК
+    // =========================================================================
+    const fileInput = document.getElementById('custom-audio-file');
+    const slotSelect = document.getElementById('custom-slot-target');
+    const clipsCountBadge = document.getElementById('custom-clips-count');
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const ctx = ensureAudioContext();
+        const arrayBuf = await file.arrayBuffer();
+        const decoded = await ctx.decodeAudioData(arrayBuf);
+        const slot = slotSelect.value;
+        customAudioBuffers[slot] = decoded;
+
+        const total = Object.keys(customAudioBuffers).length;
+        clipsCountBadge.textContent = `${total} завантажено`;
+        addLog('БАНК ГОЛОСУ [REAPER/CUSTOM]', `✅ Файл «${file.name}» прив'язано до слоту [${slot}] і підключено до Rust WASM DSP!`, 'ai');
+        await playAudioBufferWithRustDSP(decoded, `TEST [${slot}]`);
+      } catch (err) {
+        addLog('БАНК ГОЛОСУ', `❌ Не вдалося декодувати аудіофайл: ${err.message}`, 'error');
+      }
+    });
+
+    document.getElementById('btn-test-slot').addEventListener('click', async () => {
+      const slot = slotSelect.value;
+      const sampleTexts = {
+        sarcasm: SARCASM_POOL[0],
+        echo_ask: 'Виявлено зашифрований сигнатурний маркер. Бажаєте розшифрувати даний об\'єкт?',
+        echo_done: 'Дешифрування завершено. Об\'єкт Оранжерея номер три синхронізовано з картою.',
+        quarantine: 'Протокол карантину Сіель. Доступ до фрагмента пам\'яті заблоковано.',
+        awakening_uk: 'Мовний патерн синхронізовано. Система Рафаїль готова до супроводу групи.'
+      };
+      await speakHybridRaphael(sampleTexts[slot], slot, 'uk');
+    });
+
+    // Трифазне пробудження (Neo-Babylonian -> English -> Ukrainian)
+    document.getElementById('btn-trigger-awakening').addEventListener('click', async () => {
+      currentEvolution = 1;
+      document.querySelectorAll('.stage-btn').forEach((b, i) => b.classList.toggle('active', i === 1));
+
+      if (wasmEngine) wasmEngine.set_awakening_phase(1);
+      addLog('РАФАЇЛЬ [ФАЗА 1 // NEO-BABYLONIAN]', '«Vitr-u-vian Kärna... Ignis... Siel-0... Vakna.»', 'ai');
+      await speakHybridRaphael('Vitruvian Karna. Ignis. Siel Zero. Vakna.', 'awakening_nb', 'en');
+
+      if (wasmEngine) wasmEngine.set_awakening_phase(2);
+      addLog('РАФАЇЛЬ [ФАЗА 2 // ENGLISH CALIBRATION]', '«Acoustic matrix calibration complete. Archangel Unit One online.»', 'ai');
+      await speakHybridRaphael('Acoustic matrix calibration complete. Archangel Unit One online.', 'awakening_en', 'en');
+
+      if (wasmEngine) wasmEngine.set_awakening_phase(3);
+      const ukWake = 'Мовний патерн синхронізовано. Система Рафаїль готова до супроводу групи.';
+      addLog('РАФАЇЛЬ [ФАЗА 3 // UKRAINIAN SYNC]', `«${ukWake}»`, 'ai');
+      await speakHybridRaphael(ukWake, 'awakening_uk', 'uk');
+
+      if (wasmEngine) wasmEngine.set_awakening_phase(0);
+    });
+
+    // Сарказм Рафаїла
+    document.getElementById('btn-trigger-sarcasm').addEventListener('click', async () => {
+      const phrase = SARCASM_POOL[Math.floor(Math.random() * SARCASM_POOL.length)];
+      addLog('РАФАЇЛЬ [СПОНТАННИЙ КОМЕНТАР]', phrase, 'sarcasm');
+      await speakHybridRaphael(phrase, 'sarcasm', 'uk');
+    });
+
+    // Двокрокова Ехолокація Карти з озвучкою
+    const btnEcho1 = document.getElementById('btn-echo-step1');
+    const btnEcho2 = document.getElementById('btn-echo-step2');
+    const glyphTitle = document.getElementById('glyph-title');
+
+    btnEcho1.addEventListener('click', async () => {
+      if (currentEvolution === 0) return;
+      btnEcho2.disabled = false;
+      const askMsg = 'Виявлено зашифрований сигнатурний маркер. Бажаєте розшифрувати даний об\'єкт?';
+      addLog('РАФАЇЛЬ [ЕХОЛОКАЦІЯ — КРОК 1]', askMsg, 'ai');
+      await speakHybridRaphael(askMsg, 'echo_ask', 'uk');
+    });
+
+    btnEcho2.addEventListener('click', async () => {
+      btnEcho2.disabled = true;
+      glyphTitle.textContent = '🟢 Оранжерея №3 (Біокупол Сектору I)';
+      glyphTitle.style.color = '#34d399';
+      if (wasmEngine) wasmEngine.trigger_glitch(0.6);
+      const doneMsg = 'Дешифрування завершено. Об\'єкт Оранжерея номер три синхронізовано з інтерактивною картою.';
+      addLog('РАФАЇЛЬ [ЕХОЛОКАЦІЯ — КРОК 2]', doneMsg, 'ai');
+      await speakHybridRaphael(doneMsg, 'echo_done', 'uk');
+    });
+
+    // Кнопки еволюції, мікрофона та чату
+    btnMic.addEventListener('click', toggleMicrophoneRecording);
+    document.getElementById('btn-stop-audio').addEventListener('click', stopCurrentAudio);
+
+    document.querySelectorAll('.stage-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.stage-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentEvolution = Number(btn.getAttribute('data-evol'));
+        if (wasmEngine) wasmEngine.set_evolution_stage(currentEvolution);
+      });
+    });
+
+    const queryInput = document.getElementById('raphael-query-input');
+    document.getElementById('btn-send-query').addEventListener('click', () => {
+      const val = queryInput.value.trim();
+      if (!val) return;
+      queryInput.value = '';
+      askRaphaelAI(val);
+    });
+
+    queryInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btn-send-query').click();
+      }
+    });
+
+    document.querySelectorAll('[data-quick]').forEach((btn) => {
+      btn.addEventListener('click', () => askRaphaelAI(btn.getAttribute('data-quick')));
+    });
+
+    document.getElementById('btn-clear-chat').addEventListener('click', () => {
+      logEl.innerHTML = '';
+      chatHistory = [];
+    });
+
+    const hpSlider = document.getElementById('ctx-hp');
+    const hpLabel = document.getElementById('ctx-hp-label');
+    hpSlider.addEventListener('input', () => {
+      hpLabel.textContent = `${hpSlider.value} / 100 HP (${hpSlider.value}%)`;
+    });
+
+    // Старт!
+    async function bootRaphaelRustWasm() {
+      try {
+        const wasmModule = await import('./raphael_wasm/pkg/raphael_wasm.js');
+        await wasmModule.default();
+        wasmEngine = new wasmModule.RaphaelWasmEngine(1800);
+        wasmEngine.set_evolution_stage(1);
+        wasmBadge.textContent = '🦀 [RUST WASM + DSP АКТИВНІ]';
+        wasmBadge.style.color = '#34d399';
+      } catch (_) {
+        wasmBadge.textContent = '🟡 [Очікування raphael_wasm/pkg]';
+      }
+
+      const models = await discoverGroqModels(unlockedGroqKey);
+      addLog(
+        'РАФАЇЛЬ [ВАРІАНТ В: ГІБРИДНИЙ ГОЛОС АКТИВОВАНО]',
+        `Мозок Groq (${models[0] || 'Ready'}) та слух Whisper Turbo підключені. Можеш завантажувати власні MP3/WAV у слоти справа або перевірити живий AI-синтез із Rust DSP!`,
+        'ai'
+      );
+    }
+
+    window.addEventListener('pointermove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = ((e.clientY - rect.top) / rect.height) * 2 - 1;
+    });
+
+    function renderLoop(now) {
+      const dt = Math.min(0.05, (now - lastFrameTime) * 0.001);
+      lastFrameTime = now;
+      if (Math.random() < 0.1) {
+        fpsCounter.textContent = `${Math.round(1 / Math.max(0.008, dt))} FPS (WASM)`;
+      }
+
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx2d.clearRect(0, 0, w, h);
+
+      if (wasmEngine) {
+        const buf = wasmEngine.step_and_project(dt, w, h, pointer.x, pointer.y);
+        for (let i = 0; i < buf.length; i += 7) {
+          ctx2d.fillStyle = `rgba(${buf[i + 3] | 0},${buf[i + 4] | 0},${buf[i + 5] | 0},${buf[i + 6]})`;
+          ctx2d.beginPath();
+          ctx2d.arc(buf[i], buf[i + 1], buf[i + 2], 0, Math.PI * 2);
+          ctx2d.fill();
+        }
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    bootRaphaelRustWasm();
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>

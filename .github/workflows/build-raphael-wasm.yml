@@ -1,0 +1,61 @@
+name: Build Raphael Rust WASM
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'raphael_wasm/**'
+      - '.github/workflows/build-raphael-wasm.yml'
+  workflow_dispatch: # Дозволяє запускати збірку вручну кнопкою у вкладці Actions
+
+permissions:
+  contents: write # Дає право боту GitHub записувати скомпільований .wasm назад у репозиторій
+
+jobs:
+  build-wasm:
+    name: Compile raphael_wasm to WebAssembly
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Завантаження коду репозиторію
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 2. Встановлення компілятора Rust та цілі wasm32
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: 3. Кешування залежностей Cargo (прискорює збірку в 4 рази)
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "raphael_wasm -> target"
+
+      - name: 4. Встановлення wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: 5. Компіляція Rust у WebAssembly (Release Mode)
+        run: |
+          wasm-pack build raphael_wasm --target web --out-dir pkg --release
+          # КРИТИЧНО: видаляємо авто-згенерований .gitignore всередині pkg,
+          # інакше wasm-pack блокує збереження .wasm файлів у репозиторій!
+          rm -f raphael_wasm/pkg/.gitignore
+          rm -f raphael_wasm/pkg/package.json
+
+      - name: 6. Авто-коміт готових файлів .wasm та .js у репозиторій
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -f raphael_wasm/pkg/*
+
+          if git diff --staged --quiet; then
+            echo "🟢 Змін у бінарнику WASM немає, коміт не потрібен."
+          else
+            git commit -m "⚙️ Auto-build raphael_wasm pkg [skip ci]"
+            git push
+            echo "🚀 Скомпільований raphael_wasm/pkg успішно збережено в репозиторій!"
+          fi

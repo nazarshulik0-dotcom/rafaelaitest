@@ -1,9 +1,9 @@
 /**
  * ============================================================================
- * UNIVERSAL IRMINSUL VOICE CORE v3.2 (./voice/raphael_voice_core.js)
+ * UNIVERSAL IRMINSUL VOICE CORE v4.0 (./voice/raphael_voice_core.js)
  *  1) Стягує 10-вимірний вектор ДНК голосу з репозиторію NRI_IRMINSUL.
- *  2) Отримує чисту українську несучу хвилю через JSON-Base64 / бінарні шлюзи
- *     без залежності від закритих репозиторіїв HuggingFace.
+ *  2) Паралельно (Promise.any) завантажує чисту звукову хвилю через
+ *     прямі JSON-канали Lingva Audio API та шлюзи client=gtx (за 0.3 сек).
  *  3) Перековує тембр у реальному часі через Rust WASM (process_voice_dsp)
  *     та 6-смугову формантну матрицю ДНК Ірмінсуля.
  * ============================================================================
@@ -22,7 +22,7 @@ export class RaphaelVoiceCore {
       id: 'raphael_archangel_1',
       title: 'Рафаїль // Вежа Архангела I (Apex Matrix)',
       carrier_voice: 'uk-UA-OstapNeural',
-      pitch_ratio: 0.88,
+      pitch_ratio: 0.90,
       dna_vector: [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32],
       samples: {}
     };
@@ -148,10 +148,7 @@ export class RaphaelVoiceCore {
     } catch (_) {}
   }
 
-  /**
-   * Розбиває довгий текст на зручні фрази до 145 символів, щоб аудіошлюзи ніколи не обривали речення.
-   */
-  _splitTextIntoChunks(text, maxLen = 145) {
+  _splitTextIntoChunks(text, maxLen = 140) {
     const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ');
     const chunks = [];
     let current = '';
@@ -168,9 +165,6 @@ export class RaphaelVoiceCore {
     return chunks.length > 0 ? chunks : [text];
   }
 
-  /**
-   * Перетворює data:audio/mpeg;base64,... на чистий ArrayBuffer для WebAudio та Rust WASM.
-   */
   _base64ToArrayBuffer(base64String) {
     const cleanB64 = base64String.includes('base64,')
       ? base64String.split('base64,')[1]
@@ -185,56 +179,79 @@ export class RaphaelVoiceCore {
   }
 
   /**
-   * Завантажує та декодує один фрагмент мовлення через мульти-канальний конвеєр.
+   * ОНОВЛЕНИЙ ПАРАЛЕЛЬНИЙ ЗАВАНТАЖУВАЧ (Lingva JSON API + client=gtx):
+   * Опитує одразу декілька дзеркал паралельно і бере першу успішну відповідь за ~0.3 сек.
    */
   async _fetchChunkAudioBuffer(chunkText) {
     const ctx = this.ensureAudioContext();
-    const encodedText = encodeURIComponent(chunkText);
-    const googleUkUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=uk&q=${encodedText}`;
+    const q = encodeURIComponent(chunkText);
 
-    const channels = [
-      // Канал 1: JSON-Base64 міст AllOrigins (100% обходить бінарні CORS-блокування)
-      async () => {
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(googleUkUrl)}`);
-        if (!res.ok) throw new Error(`AllOrigins HTTP ${res.status}`);
+    // 1. Прямі JSON-сервери Lingva (віддають масив байтів MP3 напряму у JSON з відкритим CORS)
+    const lingvaMirrors = [
+      `https://translate.plausibility.cloud/api/v1/audio/uk/${q}`,
+      `https://lingva.lunar.icu/api/v1/audio/uk/${q}`,
+      `https://lingva.garudalinux.org/api/v1/audio/uk/${q}`,
+      `https://lingva.ml/api/v1/audio/uk/${q}`
+    ];
+
+    const fetchFromLingva = async (apiUrl) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 4500);
+      try {
+        const res = await fetch(apiUrl, {
+          mode: 'cors',
+          credentials: 'omit',
+          signal: ctrl.signal
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (!data || !data.contents || !data.contents.includes('base64,')) {
-          throw new Error('No base64 audio payload');
+        if (!data || !Array.isArray(data.audio) || data.audio.length < 200) {
+          throw new Error('Empty audio array');
         }
-        return this._base64ToArrayBuffer(data.contents);
-      },
-      // Канал 2: Прямий бінарний проксі CodeTabs
+        const byteArray = new Uint8Array(data.audio);
+        return await ctx.decodeAudioData(byteArray.buffer.slice(0));
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    try {
+      return await Promise.any(lingvaMirrors.map((url) => fetchFromLingva(url)));
+    } catch (_) {}
+
+    // 2. Резервні канали з робочим параметром client=gtx (замість заблокованого tw-ob)
+    const gtxUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=uk&q=${q}`;
+
+    const gtxTasks = [
       async () => {
-        const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(googleUkUrl)}`);
-        if (!res.ok) throw new Error(`CodeTabs HTTP ${res.status}`);
-        return await res.arrayBuffer();
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(gtxUrl)}`);
+        if (!res.ok) throw new Error('AllOrigins get failed');
+        const data = await res.json();
+        if (!data?.contents) throw new Error('Empty contents');
+        const buf = this._base64ToArrayBuffer(data.contents);
+        return await ctx.decodeAudioData(buf.slice(0));
       },
-      // Канал 3: Оновлений синтаксис CorsProxy (?url=)
       async () => {
-        const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(googleUkUrl)}`);
-        if (!res.ok) throw new Error(`CorsProxy HTTP ${res.status}`);
-        return await res.arrayBuffer();
+        const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(gtxUrl)}`);
+        if (!res.ok) throw new Error('AllOrigins raw failed');
+        const buf = await res.arrayBuffer();
+        return await ctx.decodeAudioData(buf.slice(0));
+      },
+      async () => {
+        const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(gtxUrl)}`);
+        if (!res.ok) throw new Error('CodeTabs failed');
+        const buf = await res.arrayBuffer();
+        return await ctx.decodeAudioData(buf.slice(0));
       }
     ];
 
-    for (const chFn of channels) {
-      try {
-        const rawBuf = await Promise.race([
-          chFn(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-        ]);
-        if (rawBuf && rawBuf.byteLength > 400) {
-          return await ctx.decodeAudioData(rawBuf.slice(0));
-        }
-      } catch (_) {}
-    }
+    try {
+      return await Promise.any(gtxTasks.map((fn) => fn()));
+    } catch (_) {}
 
     return null;
   }
 
-  /**
-   * Склеює масив декодованих AudioBuffer в один безшовний буфер для обробки в Rust WASM.
-   */
   _stitchAudioBuffers(buffers) {
     const ctx = this.ensureAudioContext();
     if (!buffers || buffers.length === 0) return null;
@@ -264,7 +281,6 @@ export class RaphaelVoiceCore {
     this.playCueChime();
     const ctx = this.ensureAudioContext();
 
-    // 1. Перевірка готового семплу в слоті
     if (slotKey && this.sampleBank.has(slotKey)) {
       await this.playBufferThroughRustCloneDSP(this.sampleBank.get(slotKey));
       return true;
@@ -284,9 +300,8 @@ export class RaphaelVoiceCore {
       } catch (_) {}
     }
 
-    // 2. Синтез несучої хвилі по фрагментах та склеювання в єдиний PCM-буфер
     this.onStatusChange('⏳ SYNTH + RUST DNA...');
-    const chunks = this._splitTextIntoChunks(cleanText, 145);
+    const chunks = this._splitTextIntoChunks(cleanText, 140);
     const decodedParts = [];
 
     for (const chunk of chunks) {
@@ -302,7 +317,7 @@ export class RaphaelVoiceCore {
 
     this.onLog(
       'ГОЛОСОВЕ ЯДРО [ДІАГНОСТИКА]',
-      '⚠️ Аудіошлюзи тимчасово не відповіли. Перевір інтернет-з\'єднання.',
+      '⚠️ Усі зовнішні шлюзи заблоковані браузером. Перевір, чи не блокує запити вбудований щиток AdBlock в Opera GX біля адресного рядка.',
       'error'
     );
     this.onStatusChange(`🧬 ${this.currentProfile.id}`);
@@ -348,9 +363,7 @@ export class RaphaelVoiceCore {
     // 2. Каскад формант WebAudio за вектором ДНК з NRI_IRMINSUL
     const freqs = [115, 250, 580, 1350, 2750, 4600];
     const f0 = dna[0] || 114.5;
-
-    // Авто-адаптація висоти тону під F0 профілю (глибший тон для Рафаїла/Манаса, вищий для Сіель)
-    const effectivePitch = f0 < 110 ? 0.84 : f0 < 145 ? 0.88 : (this.currentProfile.pitch_ratio || 0.97);
+    const effectivePitch = f0 < 110 ? 0.85 : f0 < 145 ? 0.90 : (this.currentProfile.pitch_ratio || 0.97);
 
     const srcNode = ctx.createBufferSource();
     srcNode.buffer = workingBuffer;

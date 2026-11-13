@@ -1,10 +1,9 @@
 /**
  * ============================================================================
  * UNIVERSAL IRMINSUL VOICE CORE (./voice/raphael_voice_core.js)
- * Працює в будь-якому репозиторії (Entropia / Ether / Irminsul / RafaelAITest):
- *  - Стягує голосові ДНК-профілі з локального або зовнішнього репозиторію Ірмінсуля.
- *  - Витягує 10-вимірний вектор ДНК із 30-сек зразка через Rust WASM (extract_voice_dna).
- *  - Перековує будь-який синтезований голос через Rust WASM Biquad + Sub-Harmonic + Apex Doubler.
+ * Стягивает голосовое ДНК напрямую из репозитория NRI_IRMINSUL
+ * или из общей памяти домена nazarshulik0-dotcom.github.io и перековывает
+ * любой текстовый ответ через Rust WASM DSP (6 формант + суб-октава + Apex Doubler).
  * ============================================================================
  */
 
@@ -14,36 +13,41 @@ export class RaphaelVoiceCore {
     this.audioCtx = null;
     this.activeSource = null;
 
-    // За замовчуванням дивиться на локальний Ірмінсуль або будь-який вказаний GitHub-репозиторій
-    this.irminsulRepo = options.irminsulRepo || 'nazarshulik0-dotcom/rafaelaitest';
+    // Точный адрес твоего репозитория Ирминсуля
+    this.irminsulRepo = 'nazarshulik0-dotcom/NRI_IRMINSUL';
     this.irminsulBranch = options.irminsulBranch || 'main';
-    this.irminsulPath = options.irminsulPath || 'irminsul/voices/irminsul_voice_bank.json';
 
     this.currentProfile = {
       id: 'raphael_archangel_1',
-      title: 'Рафаїль // Apex Matrix',
+      title: 'Рафаїль // Вежа Архангела I (Apex Matrix)',
       carrier_voice: 'uk-UA-OstapNeural',
-      pitch_ratio: 0.94,
+      pitch_ratio: 0.92,
       dna_vector: [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32],
       samples: {}
     };
 
     this.sampleBank = new Map();
-    this.irminsulBankCache = null;
-
     this.onStatusChange = options.onStatusChange || (() => {});
     this.onLog = options.onLog || (() => {});
+
+    // Слушаем общую память домена на случай, если ты обновил ДНК в соседней вкладке Ирминсуля
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'entropia_irminsul_active_voice' && e.newValue) {
+        try {
+          const prof = JSON.parse(e.newValue);
+          this.applyVoiceProfile(prof);
+          this.onLog('ІРМІНСУЛЬ [LIVE SYNC]', `🧬 Профіль «${prof.title}» миттєво підхоплено з сусідньої вкладки Ірмінсуля!`, 'ai');
+        } catch (_) {}
+      }
+    });
   }
 
-  /**
-   * Підключає скомпільований Rust WASM і одразу передає йому поточне ДНК голосу.
-   */
   attachRustWasm(wasmEngineInstance) {
     this.wasmEngine = wasmEngineInstance;
     if (this.wasmEngine && typeof this.wasmEngine.load_voice_dna === 'function') {
       this.wasmEngine.load_voice_dna(new Float32Array(this.currentProfile.dna_vector));
     }
-    this.onStatusChange(`🦀 DNA ACTIVE: ${this.currentProfile.id}`);
+    this.onStatusChange(`🦀 DNA: ${this.currentProfile.id}`);
   }
 
   ensureAudioContext() {
@@ -70,15 +74,17 @@ export class RaphaelVoiceCore {
   }
 
   /**
-   * УНІВЕРСАЛЬНИЙ ЗАВАНТАЖУВАЧ ІЗ «ІРМІНСУЛЯ»:
-   * Може стягнути голосовий профіль із поточного сайту АБО з будь-якого іншого репозиторію GitHub!
-   * Наприклад: voiceCore.pullProfileFromIrminsul('raphael_archangel_1', 'nazarshulik0-dotcom/rafaelaitest')
+   * Стягивает голосовой профиль из NRI_IRMINSUL (проверяет все возможные папки + общую память браузера).
    */
-  async pullProfileFromIrminsul(profileId = 'raphael_archangel_1', customRepo = null) {
-    const repo = customRepo || this.irminsulRepo;
+  async pullProfileFromIrminsul(profileId = 'raphael_archangel_1') {
     const candidateUrls = [
-      `./${this.irminsulPath}`,
-      `https://raw.githubusercontent.com/${repo}/${this.irminsulBranch}/${this.irminsulPath}`
+      `https://nazarshulik0-dotcom.github.io/NRI_IRMINSUL/voices/irminsul_voice_bank.json`,
+      `https://nazarshulik0-dotcom.github.io/NRI_IRMINSUL/irminsul_voice_bank.json`,
+      `https://raw.githubusercontent.com/${this.irminsulRepo}/${this.irminsulBranch}/voices/irminsul_voice_bank.json`,
+      `https://raw.githubusercontent.com/${this.irminsulRepo}/${this.irminsulBranch}/irminsul_voice_bank.json`,
+      `https://raw.githubusercontent.com/${this.irminsulRepo}/${this.irminsulBranch}/irminsul/voices/irminsul_voice_bank.json`,
+      `./irminsul/voices/irminsul_voice_bank.json`,
+      `./voices/irminsul_voice_bank.json`
     ];
 
     for (const url of candidateUrls) {
@@ -86,14 +92,13 @@ export class RaphaelVoiceCore {
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) continue;
         const bank = await res.json();
-        this.irminsulBankCache = bank;
+        const prof = bank?.profiles?.[profileId] || Object.values(bank?.profiles || {})[0];
 
-        const prof = bank?.profiles?.[profileId];
         if (prof && Array.isArray(prof.dna_vector)) {
           this.applyVoiceProfile(prof);
           this.onLog(
-            'ІРМІНСУЛЬ [VOICE BANK]',
-            `✅ Голосовий профіль «${prof.title}» успішно стягнуто з Ірмінсуля (${url}) і завантажено в Rust WASM!`,
+            'ІРМІНСУЛЬ [NRI_IRMINSUL]',
+            `✅ Голосове ДНК «${prof.title}» (${prof.dna_vector[0]} Hz) стягнуто з NRI_IRMINSUL і завантажено в Rust WASM!`,
             'ai'
           );
           return prof;
@@ -101,14 +106,11 @@ export class RaphaelVoiceCore {
       } catch (_) {}
     }
 
-    // Якщо JSON ще не залитий на GitHub — перевіряємо локальний кеш браузера
+    // Если файл еще не залит в репозиторий — берем из общей памяти домена github.io
     this.restoreSavedVoicePrint();
     return this.currentProfile;
   }
 
-  /**
-   * Застосовує профіль (з Ірмінсуля або після клонування) безпосередньо в Rust WASM.
-   */
   applyVoiceProfile(profileObj) {
     if (!profileObj) return;
     this.currentProfile = {
@@ -124,76 +126,39 @@ export class RaphaelVoiceCore {
       localStorage.setItem('entropia_irminsul_active_voice', JSON.stringify(this.currentProfile));
     } catch (_) {}
 
-    this.onStatusChange(`🧬 ${this.currentProfile.id} (${this.currentProfile.dna_vector[0]}Hz)`);
+    const f0 = this.currentProfile.dna_vector?.[0] || 115;
+    this.onStatusChange(`🧬 ${this.currentProfile.id} (${f0}Hz)`);
   }
 
   restoreSavedVoicePrint() {
     try {
-      const saved = localStorage.getItem('entropia_irminsul_active_voice');
+      const saved =
+        localStorage.getItem('entropia_irminsul_active_voice') ||
+        localStorage.getItem('entropia_raphael_voice_dna');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed.dna_vector)) {
-          this.applyVoiceProfile(parsed);
+        if (parsed) {
+          if (!parsed.dna_vector && parsed.formantGainsDb) {
+            parsed.dna_vector = [
+              parsed.fundamentalHz || 115,
+              ...parsed.formantGainsDb,
+              0.22,
+              0.36,
+              1.32
+            ];
+          }
+          if (Array.isArray(parsed.dna_vector)) {
+            this.applyVoiceProfile(parsed);
+          }
         }
       }
     } catch (_) {}
   }
 
   /**
-   * ВИВЧЕННЯ ГОЛОСУ З 30-СЕКУНДНОГО ФРАГМЕНТА АНІМАТИКА ЧЕРЕЗ RUST WASM:
-   * Викликає wasmEngine.extract_voice_dna() і видає готовий JSON-код для вставки в Ірмінсуль!
-   */
-  async learnVoiceFromReferenceFile(file, targetProfileId = 'raphael_archangel_1') {
-    const ctx = this.ensureAudioContext();
-    this.onStatusChange('⏳ RUST EXTRACTING DNA...');
-
-    const arrayBuf = await file.arrayBuffer();
-    const audioBuffer = await ctx.decodeAudioData(arrayBuf);
-    const channelData = audioBuffer.getChannelData(0);
-    const sr = audioBuffer.sampleRate;
-
-    let dnaArray = [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32];
-
-    if (this.wasmEngine && typeof this.wasmEngine.extract_voice_dna === 'function') {
-      const rustVec = this.wasmEngine.extract_voice_dna(channelData, sr);
-      dnaArray = Array.from(rustVec).map((v) => Number(v.toFixed(2)));
-    }
-
-    const f0 = dnaArray[0] || 115;
-    const computedPitch = Number(Math.max(0.84, Math.min(1.08, f0 / 128.0)).toFixed(2));
-
-    const newProfile = {
-      id: targetProfileId,
-      title: `Cloned: ${file.name.replace(/\.[^.]+$/, '')}`,
-      carrier_voice: f0 > 165 ? 'uk-UA-PolinaNeural' : 'uk-UA-OstapNeural',
-      pitch_ratio: computedPitch,
-      dna_vector: dnaArray,
-      samples: this.currentProfile.samples || {}
-    };
-
-    this.applyVoiceProfile(newProfile);
-
-    // Формуємо готовий JSON-сниппет для вставки в irminsul_voice_bank.json
-    const irminsulJsonSnippet = JSON.stringify(newProfile, null, 2);
-    try {
-      await navigator.clipboard.writeText(irminsulJsonSnippet);
-    } catch (_) {}
-
-    this.onLog(
-      'RUST CLONER -> ІРМІНСУЛЬ',
-      `🧬 Зразок «${file.name}» проаналізовано в Rust WASM! Вектор ДНК: [${dnaArray.join(', ')}]. Готовий JSON-профіль для «Ірмінсуля» автоматично скопійовано в буфер обміну!`,
-      'ai'
-    );
-
-    // Програємо перші 4.5 секунди зразка крізь нову матрицю Rust для миттєвої перевірки
-    await this.playBufferThroughRustCloneDSP(audioBuffer, 4.5);
-    return newProfile;
-  }
-
-  /**
-   * ГОЛОВНИЙ МЕТОД МОВЛЕННЯ:
-   * 1) Перевіряє пре-рендерені семпли в Ірмінсулі.
-   * 2) Якщо це вільний текст — синтезує чисту несучу хвилю і перековує її в Rust WASM під ДНК Ірмінсуля.
+   * ГЛАВНЫЙ МЕТОД ОЗВУЧКИ:
+   * Разбивает ответ на предложения, скачивает бинарный аудио-поток (ArrayBuffer)
+   * и КАЖДЫЙ сэмпл принудительно пропускает через Rust WASM + 6 формант ДНК из Ирминсуля!
    */
   async speak(text, slotKey = null) {
     const cleanText = String(text || '').replace(/\[.*?\]/g, '').trim();
@@ -202,13 +167,12 @@ export class RaphaelVoiceCore {
     this.playCueChime();
     const ctx = this.ensureAudioContext();
 
-    // 1. Якщо є завантажений у пам'ять семпл для цього слоту
+    // 1. Проверяем готовый сэмпл в слоте
     if (slotKey && this.sampleBank.has(slotKey)) {
       await this.playBufferThroughRustCloneDSP(this.sampleBank.get(slotKey));
       return true;
     }
 
-    // 2. Якщо в профілі Ірмінсуля прописаний шлях до готового MP3/WAV для цього слоту
     const slotUrl = slotKey && this.currentProfile.samples?.[slotKey];
     if (slotUrl) {
       try {
@@ -223,24 +187,34 @@ export class RaphaelVoiceCore {
       } catch (_) {}
     }
 
-    // 3. Генерація живої мови з тексту + перековка через Rust WASM ДНК
-    this.onStatusChange('⏳ SYNTH + RUST DNA...');
-    const rawBuffer = await this._synthesizeCleanCarrierBuffer(cleanText);
+    // 2. Разбиваем текст на предложения, чтобы озвучка стартовала быстро и никогда не обрывалась
+    const sentences = cleanText.match(/[^.!?]+[.!?]*|[^.!?]+$/g) || [cleanText];
+    let anyPlayed = false;
 
-    if (rawBuffer) {
-      await this.playBufferThroughRustCloneDSP(rawBuffer);
-      return true;
+    for (const rawSentence of sentences) {
+      const sentence = rawSentence.trim();
+      if (!sentence) continue;
+
+      this.onStatusChange('⏳ SYNTH + RUST DNA...');
+      const carrierBuffer = await this._synthesizeCleanCarrierBuffer(sentence);
+      if (carrierBuffer) {
+        anyPlayed = true;
+        await this.playBufferThroughRustCloneDSP(carrierBuffer);
+      }
     }
 
-    // Якщо хмарний генератор несучої хвилі недоступний — даємо імпульс на сферу
-    if (this.wasmEngine) {
+    if (!anyPlayed && this.wasmEngine) {
       this.wasmEngine.set_voice_energy(0.85);
       setTimeout(() => this.wasmEngine.set_voice_energy(0.0), 1400);
     }
+
     this.onStatusChange(`🧬 ${this.currentProfile.id}`);
-    return false;
+    return anyPlayed;
   }
 
+  /**
+   * Прогоняет AudioBuffer сквозь Rust WASM (process_voice_dsp) + 6-полосный Biquad слепок ДНК.
+   */
   async playBufferThroughRustCloneDSP(sourceBuffer, maxDurationSec = null) {
     this.stop();
     const ctx = this.ensureAudioContext();
@@ -260,7 +234,7 @@ export class RaphaelVoiceCore {
       workingBuffer.copyToChannel(srcData, ch);
     }
 
-    // Проганяємо аудіобуфер безпосередньо через Rust WASM (6 Biquad-формант ДНК + Sub-Octave + Apex Doubler)
+    // 1. Обработка внутри скомпилированного Rust WASM (Biquad DNA + Sub-Harmonic + Apex Doubler)
     const primary = workingBuffer.getChannelData(0);
     if (this.wasmEngine && typeof this.wasmEngine.process_voice_dsp === 'function') {
       const chunk = 2048;
@@ -270,19 +244,34 @@ export class RaphaelVoiceCore {
       }
     }
 
+    // 2. Дополнительный аппаратный каскад формант WebAudio по вектору ДНК из Ирминсуля
+    const dna = this.currentProfile.dna_vector || [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32];
+    const freqs = [115, 250, 580, 1350, 2750, 4600];
+
     const srcNode = ctx.createBufferSource();
     srcNode.buffer = workingBuffer;
-    srcNode.playbackRate.value = this.currentProfile.pitch_ratio || 0.94;
+    srcNode.playbackRate.value = this.currentProfile.pitch_ratio || 0.92;
+
+    let lastNode = srcNode;
+    for (let i = 0; i < freqs.length; i++) {
+      const eq = ctx.createBiquadFilter();
+      eq.type = i === 0 ? 'lowshelf' : i === freqs.length - 1 ? 'highshelf' : 'peaking';
+      eq.frequency.value = freqs[i];
+      eq.Q.value = 1.45;
+      eq.gain.value = dna[i + 1] ?? 0;
+      lastNode.connect(eq);
+      lastNode = eq;
+    }
 
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 256;
     const pcmData = new Float32Array(analyser.fftSize);
 
-    srcNode.connect(analyser);
+    lastNode.connect(analyser);
     analyser.connect(ctx.destination);
 
     this.activeSource = srcNode;
-    this.onStatusChange(`🔊 [${this.currentProfile.id}]`);
+    this.onStatusChange(`🔊 SPEAKING [${this.currentProfile.id}]`);
     if (this.wasmEngine) this.wasmEngine.set_activity_mode(4);
 
     let playing = true;
@@ -314,45 +303,74 @@ export class RaphaelVoiceCore {
     });
   }
 
+  /**
+   * Безотказное получение бинарного AudioBuffer для последующей перековки в Rust WASM.
+   */
   async _synthesizeCleanCarrierBuffer(text) {
     const ctx = this.ensureAudioContext();
     const carrierVoice = this.currentProfile.carrier_voice || 'uk-UA-OstapNeural';
+    const shortText = text.slice(0, 200);
+    const encoded = encodeURIComponent(shortText);
+    const targetTtsUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=uk&q=${encoded}`;
 
-    const endpoints = [
+    const binaryEndpoints = [
+      // 1. Локальный мост (если запущен)
       async () => {
         const res = await fetch('http://127.0.0.1:8765/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, voice: carrierVoice })
+          body: JSON.stringify({ text: shortText, voice: carrierVoice })
         });
-        if (!res.ok) throw new Error('Local bridge offline');
+        if (!res.ok) throw new Error('Local offline');
         return await res.arrayBuffer();
       },
+      // 2. Edge Neural шлюз 1
       async () => {
         const res = await fetch('https://tts.travisvn.com/v1/audio/speech', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'tts-1', input: text, voice: carrierVoice })
+          body: JSON.stringify({ model: 'tts-1', input: shortText, voice: carrierVoice })
         });
-        if (!res.ok) throw new Error('Edge gateway 1 busy');
+        if (!res.ok) throw new Error('Edge 1 busy');
         return await res.arrayBuffer();
       },
+      // 3. Edge Neural шлюз 2
       async () => {
         const res = await fetch('https://edgetts.api.uhsea.com/v1/audio/speech', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'tts-1', input: text, voice: carrierVoice })
+          body: JSON.stringify({ model: 'tts-1', input: shortText, voice: carrierVoice })
         });
-        if (!res.ok) throw new Error('Edge gateway 2 busy');
+        if (!res.ok) throw new Error('Edge 2 busy');
+        return await res.arrayBuffer();
+      },
+      // 4. Бинарный перехват потока через CORS-прокси (декодируется в AudioBuffer и идет в Rust DSP!)
+      async () => {
+        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetTtsUrl)}`);
+        if (!res.ok) throw new Error('CORS proxy 1 busy');
+        return await res.arrayBuffer();
+      },
+      // 5. Резервный бинарный CORS-мост AllOrigins Raw
+      async () => {
+        const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetTtsUrl)}`);
+        if (!res.ok) throw new Error('CORS proxy 2 busy');
         return await res.arrayBuffer();
       }
     ];
 
-    for (const fn of endpoints) {
+    for (const fetchFn of binaryEndpoints) {
       try {
-        const buf = await fn();
-        if (buf && buf.byteLength > 800) {
-          return await ctx.decodeAudioData(buf);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 4500);
+        const buf = await Promise.race([
+          fetchFn(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 4500))
+        ]);
+        clearTimeout(timer);
+
+        if (buf && buf.byteLength > 600) {
+          const copyBuf = buf.slice(0);
+          return await ctx.decodeAudioData(copyBuf);
         }
       } catch (_) {}
     }

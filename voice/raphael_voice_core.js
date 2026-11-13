@@ -1,10 +1,11 @@
 /**
  * ============================================================================
- * UNIVERSAL IRMINSUL VOICE CORE v3.0 (./voice/raphael_voice_core.js)
- * Автономне голосове ядро на базі:
- *  1) Локальної української нейромережі VITS (Xenova/mms-tts-ukr у WebAssembly)
- *  2) Стягування 10-вимірного ДНК голосу з репозиторію NRI_IRMINSUL
- *  3) Перековки тембру в реальному часі через Rust WASM (process_voice_dsp)
+ * UNIVERSAL IRMINSUL VOICE CORE v3.2 (./voice/raphael_voice_core.js)
+ *  1) Стягує 10-вимірний вектор ДНК голосу з репозиторію NRI_IRMINSUL.
+ *  2) Отримує чисту українську несучу хвилю через JSON-Base64 / бінарні шлюзи
+ *     без залежності від закритих репозиторіїв HuggingFace.
+ *  3) Перековує тембр у реальному часі через Rust WASM (process_voice_dsp)
+ *     та 6-смугову формантну матрицю ДНК Ірмінсуля.
  * ============================================================================
  */
 
@@ -21,14 +22,10 @@ export class RaphaelVoiceCore {
       id: 'raphael_archangel_1',
       title: 'Рафаїль // Вежа Архангела I (Apex Matrix)',
       carrier_voice: 'uk-UA-OstapNeural',
-      pitch_ratio: 0.94,
+      pitch_ratio: 0.88,
       dna_vector: [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32],
       samples: {}
     };
-
-    // Локальний WASM-синтезатор української мови (HuggingFace Transformers.js)
-    this.localVitsPipe = null;
-    this.isVitsLoading = false;
 
     this.sampleBank = new Map();
     this.onStatusChange = options.onStatusChange || (() => {});
@@ -81,7 +78,7 @@ export class RaphaelVoiceCore {
   }
 
   /**
-   * Стягує голосовий банк із репозиторію NRI_IRMINSUL і виводить точний звіт у лог.
+   * Стягує голосовий профіль із репозиторію NRI_IRMINSUL.
    */
   async pullProfileFromIrminsul(profileId = 'raphael_archangel_1') {
     const bust = `?t=${Date.now()}`;
@@ -106,7 +103,7 @@ export class RaphaelVoiceCore {
           this.applyVoiceProfile(prof);
           this.onLog(
             'ІРМІНСУЛЬ [NRI_IRMINSUL]',
-            `✅ Голосовий профіль «${prof.title}» (F0: ${prof.dna_vector[0]} Hz) успішно стягнуто з NRI_IRMINSUL і завантажено в Rust WASM!`,
+            `✅ Голосовий профіль «${prof.title}» (F0: ${prof.dna_vector[0]} Hz) стягнуто з NRI_IRMINSUL і завантажено в Rust WASM!`,
             'ai'
           );
           return prof;
@@ -115,11 +112,6 @@ export class RaphaelVoiceCore {
     }
 
     this.restoreSavedVoicePrint();
-    this.onLog(
-      'ІРМІНСУЛЬ [ЛОКАЛЬНИЙ КЕШ]',
-      `ℹ️ Використовується активний профіль «${this.currentProfile.title}» (${this.currentProfile.dna_vector[0]} Hz).`,
-      'ai'
-    );
     return this.currentProfile;
   }
 
@@ -157,85 +149,113 @@ export class RaphaelVoiceCore {
   }
 
   /**
-   * Нормалізує числа та символи в українські слова для чистого читання локальною нейромережею VITS.
+   * Розбиває довгий текст на зручні фрази до 145 символів, щоб аудіошлюзи ніколи не обривали речення.
    */
-  _normalizeUkrainianText(text) {
-    const numMap = {
-      '0': 'нуль',
-      '1': 'один',
-      '2': 'два',
-      '3': 'три',
-      '4': 'чотири',
-      '5': 'пять',
-      '6': 'шість',
-      '7': 'сім',
-      '8': 'вісім',
-      '9': 'девять',
-      '10': 'десять',
-      '85': 'вісімдесят пять',
-      '100': 'сто'
-    };
+  _splitTextIntoChunks(text, maxLen = 145) {
+    const words = String(text || '').replace(/\s+/g, ' ').trim().split(' ');
+    const chunks = [];
+    let current = '';
 
-    let out = String(text || '')
-      .replace(/%/g, ' відсотків ')
-      .replace(/\b(\d+)\b/g, (m) => numMap[m] || m)
-      .replace(/[^\u0400-\u04FFa-zA-Z\s.,!?-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    for (const w of words) {
+      if ((current + ' ' + w).trim().length > maxLen) {
+        if (current.trim()) chunks.push(current.trim());
+        current = w;
+      } else {
+        current = (current + ' ' + w).trim();
+      }
+    }
+    if (current.trim()) chunks.push(current.trim());
+    return chunks.length > 0 ? chunks : [text];
+  }
 
+  /**
+   * Перетворює data:audio/mpeg;base64,... на чистий ArrayBuffer для WebAudio та Rust WASM.
+   */
+  _base64ToArrayBuffer(base64String) {
+    const cleanB64 = base64String.includes('base64,')
+      ? base64String.split('base64,')[1]
+      : base64String;
+    const binary = window.atob(cleanB64.trim());
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  }
+
+  /**
+   * Завантажує та декодує один фрагмент мовлення через мульти-канальний конвеєр.
+   */
+  async _fetchChunkAudioBuffer(chunkText) {
+    const ctx = this.ensureAudioContext();
+    const encodedText = encodeURIComponent(chunkText);
+    const googleUkUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=uk&q=${encodedText}`;
+
+    const channels = [
+      // Канал 1: JSON-Base64 міст AllOrigins (100% обходить бінарні CORS-блокування)
+      async () => {
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(googleUkUrl)}`);
+        if (!res.ok) throw new Error(`AllOrigins HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data || !data.contents || !data.contents.includes('base64,')) {
+          throw new Error('No base64 audio payload');
+        }
+        return this._base64ToArrayBuffer(data.contents);
+      },
+      // Канал 2: Прямий бінарний проксі CodeTabs
+      async () => {
+        const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(googleUkUrl)}`);
+        if (!res.ok) throw new Error(`CodeTabs HTTP ${res.status}`);
+        return await res.arrayBuffer();
+      },
+      // Канал 3: Оновлений синтаксис CorsProxy (?url=)
+      async () => {
+        const res = await fetch(`https://corsproxy.io/?url=${encodeURIComponent(googleUkUrl)}`);
+        if (!res.ok) throw new Error(`CorsProxy HTTP ${res.status}`);
+        return await res.arrayBuffer();
+      }
+    ];
+
+    for (const chFn of channels) {
+      try {
+        const rawBuf = await Promise.race([
+          chFn(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+        ]);
+        if (rawBuf && rawBuf.byteLength > 400) {
+          return await ctx.decodeAudioData(rawBuf.slice(0));
+        }
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  /**
+   * Склеює масив декодованих AudioBuffer в один безшовний буфер для обробки в Rust WASM.
+   */
+  _stitchAudioBuffers(buffers) {
+    const ctx = this.ensureAudioContext();
+    if (!buffers || buffers.length === 0) return null;
+    if (buffers.length === 1) return buffers[0];
+
+    const sr = buffers[0].sampleRate;
+    const totalLength = buffers.reduce((acc, b) => acc + b.length, 0);
+    const out = ctx.createBuffer(1, totalLength, sr);
+    const outData = out.getChannelData(0);
+
+    let offset = 0;
+    for (const b of buffers) {
+      outData.set(b.getChannelData(0), offset);
+      offset += b.length;
+    }
     return out;
   }
 
   /**
-   * Ініціалізує автономну українську нейромережу VITS (Xenova/mms-tts-ukr) прямо у браузері.
-   */
-  async _ensureLocalNeuralVits() {
-    if (this.localVitsPipe) return this.localVitsPipe;
-    if (this.isVitsLoading) {
-      while (this.isVitsLoading) {
-        await new Promise((r) => setTimeout(r, 200));
-      }
-      return this.localVitsPipe;
-    }
-
-    this.isVitsLoading = true;
-    try {
-      this.onStatusChange('📥 LOADING UKR VITS WASM...');
-      this.onLog(
-        'ГОЛОСОВЕ ЯДРО [WASM NEURAL TTS]',
-        '⏳ Завантаження автономної української нейромережі голосу (Xenova/mms-tts-ukr). Перший запуск триває ~5–8 секунд, далі працює миттєво з кешу...',
-        'ai'
-      );
-
-      const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
-      env.allowLocalModels = false;
-
-      this.localVitsPipe = await pipeline('text-to-speech', 'Xenova/mms-tts-ukr', {
-        quantized: false
-      });
-
-      this.onLog(
-        'ГОЛОСОВЕ ЯДРО [WASM NEURAL TTS]',
-        '✅ Автономну українську нейромережу завантажено в пам\'ять! Голос генерується локально і перековується через Rust WASM + ДНК Ірмінсуля.',
-        'ai'
-      );
-      return this.localVitsPipe;
-    } catch (err) {
-      this.onLog(
-        'ГОЛОСОВЕ ЯДРО [ПОМИЛКА VITS]',
-        `⚠️ Не вдалося завантажити локальну нейромодель VITS: ${err.message}`,
-        'error'
-      );
-      return null;
-    } finally {
-      this.isVitsLoading = false;
-    }
-  }
-
-  /**
    * ГОЛОВНИЙ МЕТОД ОЗВУЧЕННЯ:
-   * Генерує чистий український голос локальною нейромережею у браузері
-   * і пропускає його крізь Rust WASM (process_voice_dsp) + 6 формант ДНК Ірмінсуля!
+   * Збирає чисту несучу хвилю і проганяє її крізь Rust WASM (process_voice_dsp) + 6 формант ДНК Ірмінсуля.
    */
   async speak(text, slotKey = null) {
     const cleanText = String(text || '').replace(/\[.*?\]/g, '').trim();
@@ -244,7 +264,7 @@ export class RaphaelVoiceCore {
     this.playCueChime();
     const ctx = this.ensureAudioContext();
 
-    // 1. Якщо є готовий записаний семпл для цього слоту
+    // 1. Перевірка готового семплу в слоті
     if (slotKey && this.sampleBank.has(slotKey)) {
       await this.playBufferThroughRustCloneDSP(this.sampleBank.get(slotKey));
       return true;
@@ -264,45 +284,29 @@ export class RaphaelVoiceCore {
       } catch (_) {}
     }
 
-    // 2. Генеруємо живу мову автономною нейромережею у браузері + перековуємо через Rust WASM
-    this.onStatusChange('⏳ SYNTHESIZING IN WASM...');
-    const carrierBuffer = await this._synthesizeCleanCarrierBuffer(cleanText);
+    // 2. Синтез несучої хвилі по фрагментах та склеювання в єдиний PCM-буфер
+    this.onStatusChange('⏳ SYNTH + RUST DNA...');
+    const chunks = this._splitTextIntoChunks(cleanText, 145);
+    const decodedParts = [];
 
-    if (carrierBuffer) {
-      await this.playBufferThroughRustCloneDSP(carrierBuffer);
+    for (const chunk of chunks) {
+      const partBuf = await this._fetchChunkAudioBuffer(chunk);
+      if (partBuf) decodedParts.push(partBuf);
+    }
+
+    const fullCarrierBuffer = this._stitchAudioBuffers(decodedParts);
+    if (fullCarrierBuffer) {
+      await this.playBufferThroughRustCloneDSP(fullCarrierBuffer);
       return true;
     }
 
     this.onLog(
       'ГОЛОСОВЕ ЯДРО [ДІАГНОСТИКА]',
-      '⚠️ Не вдалося згенерувати аудіо-буфер. Перевір підключення до мережі або консоль (F12).',
+      '⚠️ Аудіошлюзи тимчасово не відповіли. Перевір інтернет-з\'єднання.',
       'error'
     );
+    this.onStatusChange(`🧬 ${this.currentProfile.id}`);
     return false;
-  }
-
-  async _synthesizeCleanCarrierBuffer(text) {
-    const ctx = this.ensureAudioContext();
-    const normalizedText = this._normalizeUkrainianText(text);
-
-    // 1. Локальна українська нейромережа VITS (100% без проксі та без лімітів!)
-    const vits = await this._ensureLocalNeuralVits();
-    if (vits && normalizedText) {
-      try {
-        this.onStatusChange('⚡ VITS + RUST DNA...');
-        const output = await vits(normalizedText);
-        if (output && output.audio && output.audio.length > 100) {
-          const sr = output.sampling_rate || 16000;
-          const audioBuffer = ctx.createBuffer(1, output.audio.length, sr);
-          audioBuffer.copyToChannel(output.audio, 0);
-          return audioBuffer;
-        }
-      } catch (err) {
-        this.onLog('ГОЛОСОВЕ ЯДРО [VITS SYNTH]', `⚠️ Помилка генерації хвилі: ${err.message}`, 'error');
-      }
-    }
-
-    return null;
   }
 
   /**
@@ -328,23 +332,29 @@ export class RaphaelVoiceCore {
       workingBuffer.copyToChannel(srcData, ch);
     }
 
-    // 1. Перековка в Rust WASM (6 Biquad-резонаторів ДНК + суб-гармоніка + Apex Stereo Doubler)
     const primary = workingBuffer.getChannelData(0);
+    const sr = workingBuffer.sampleRate;
+    const dna = this.currentProfile.dna_vector || [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32];
+
+    // 1. Перековка в Rust WASM (6 Biquad-резонаторів ДНК + суб-гармоніка + Apex Stereo Doubler)
     if (this.wasmEngine && typeof this.wasmEngine.process_voice_dsp === 'function') {
       const chunk = 2048;
       for (let i = 0; i < primary.length; i += chunk) {
         const slice = primary.subarray(i, Math.min(i + chunk, primary.length));
-        this.wasmEngine.process_voice_dsp(slice, workingBuffer.sampleRate);
+        this.wasmEngine.process_voice_dsp(slice, sr);
       }
     }
 
     // 2. Каскад формант WebAudio за вектором ДНК з NRI_IRMINSUL
-    const dna = this.currentProfile.dna_vector || [114.5, 4.2, 2.6, -2.1, 3.4, 2.1, -1.5, 0.22, 0.36, 1.32];
     const freqs = [115, 250, 580, 1350, 2750, 4600];
+    const f0 = dna[0] || 114.5;
+
+    // Авто-адаптація висоти тону під F0 профілю (глибший тон для Рафаїла/Манаса, вищий для Сіель)
+    const effectivePitch = f0 < 110 ? 0.84 : f0 < 145 ? 0.88 : (this.currentProfile.pitch_ratio || 0.97);
 
     const srcNode = ctx.createBufferSource();
     srcNode.buffer = workingBuffer;
-    srcNode.playbackRate.value = this.currentProfile.pitch_ratio || 0.94;
+    srcNode.playbackRate.value = effectivePitch;
 
     let lastNode = srcNode;
     for (let i = 0; i < freqs.length; i++) {

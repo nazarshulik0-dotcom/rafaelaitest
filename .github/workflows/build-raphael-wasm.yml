@@ -6,12 +6,13 @@ on:
       - main
       - master
     paths:
-      - 'raphael_wasm/**'
+      - 'raphael_wasm/Cargo.toml'
+      - 'raphael_wasm/src/**'
       - '.github/workflows/build-raphael-wasm.yml'
-  workflow_dispatch: # Дозволяє запускати збірку вручну кнопкою у вкладці Actions
+  workflow_dispatch:
 
 permissions:
-  contents: write # Дає право боту GitHub записувати скомпільований .wasm назад у репозиторій
+  contents: write
 
 jobs:
   build-wasm:
@@ -19,33 +20,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 1. Завантаження коду репозиторію
+      - name: 1. Загрузка кода репозитория
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 2. Встановлення компілятора Rust та цілі wasm32
+      - name: 2. Установка компилятора Rust и цели wasm32
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
 
-      - name: 3. Кешування залежностей Cargo (прискорює збірку в 4 рази)
+      - name: 3. Кэширование зависимостей Cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "raphael_wasm -> target"
 
-      - name: 4. Встановлення wasm-pack
+      - name: 4. Установка wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-      - name: 5. Компіляція Rust у WebAssembly (Release Mode)
+      - name: 5. Компиляция Rust в WebAssembly (Release Mode)
         run: |
           wasm-pack build raphael_wasm --target web --out-dir pkg --release
-          # КРИТИЧНО: видаляємо авто-згенерований .gitignore всередині pkg,
-          # інакше wasm-pack блокує збереження .wasm файлів у репозиторій!
           rm -f raphael_wasm/pkg/.gitignore
           rm -f raphael_wasm/pkg/package.json
 
-      - name: 6. Авто-коміт готових файлів .wasm та .js у репозиторій
+      - name: 6. Авто-коммит готовых файлов .wasm и .js в репозиторий
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -53,9 +52,10 @@ jobs:
           git add -f raphael_wasm/pkg/*
 
           if git diff --staged --quiet; then
-            echo "🟢 Змін у бінарнику WASM немає, коміт не потрібен."
+            echo "🟢 Бинарник WASM уже актуален, новый коммит не нужен."
           else
-            git commit -m "⚙️ Auto-build raphael_wasm pkg [skip ci]"
+            git commit -m "⚙️ Auto-build raphael_wasm pkg"
+            git pull --rebase origin main
             git push
-            echo "🚀 Скомпільований raphael_wasm/pkg успішно збережено в репозиторій!"
+            echo "🚀 Скомпилированный raphael_wasm/pkg успешно обновлён!"
           fi

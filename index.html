@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>РАФАЇЛЬ // Hybrid Voice (A+B=C) + Rust WASM + Groq</title>
+  <title>РАФАЇЛЬ // Live Voice + Rust WASM + Groq</title>
   <style>
     :root {
       --bg-deep: #04070b;
@@ -320,7 +320,7 @@
 
   <header class="top-bar">
     <div class="brand-title">
-      <span>💠 РАФАЇЛЬ // ГІБРИДНИЙ ГОЛОС (ВАРІАНТ В: ПРЕ-РЕНДЕР + AI SYNTH + RUST DSP)</span>
+      <span>💠 РАФАЇЛЬ // ГІБРИДНИЙ ГОЛОС (LIVE SYNTH + RUST DSP + ПРЕ-РЕНДЕР)</span>
       <span id="wasm-status-badge" style="font-size:11px;color:#fbbf24;">[⏳ Завантаження raphael_wasm...]</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
@@ -331,7 +331,7 @@
 
   <main class="command-grid">
 
-    <!-- ЛІВА КОЛОНКА: КОНТЕКСТ ГРАВЦЯ, ЕХОЛОКАЦІЯ ТА БАНК ВЛАСНИХ ЗАПИСІВ -->
+    <!-- ЛІВА КОЛОНКА: КОНТЕКСТ ГРАВЦЯ, ЕХОЛОКАЦІЯ ТА ТЕСТИ ГОЛОСУ -->
     <section class="panel">
       <div class="panel-header">
         <span>🧬 Контекст Суб'єкта & Ірмінсуль</span>
@@ -389,7 +389,7 @@
 • Оранжерея №3: центральний ботанічний купол Карантинних Садів, де розташовано Маяк Архангела I (Рафаїла).</textarea>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-        <button type="button" id="btn-trigger-awakening" class="btn btn-cyan" title="Трифазна ініціалізація: Neo-Babylonian -> English -> Ukrainian">
+        <button type="button" id="btn-trigger-awakening" class="btn btn-cyan">
           ⚡ 3-Фазне Пробудження
         </button>
         <button type="button" id="btn-trigger-sarcasm" class="btn btn-amber">
@@ -416,9 +416,8 @@
       </div>
 
       <div style="width:100%;display:flex;flex-direction:column;gap:8px;">
-        <!-- РЯДОК ВВОДУ + МІКРОФОН GROQ WHISPER TURBO -->
         <div style="display:flex;gap:7px;">
-          <button type="button" id="btn-mic-toggle" class="btn btn-mic" style="padding:0 14px;white-space:nowrap;" title="Голосове введення через Rust VAD + Groq Whisper Large v3 Turbo">
+          <button type="button" id="btn-mic-toggle" class="btn btn-mic" style="padding:0 14px;white-space:nowrap;">
             🎙️ Говорити
           </button>
           <input
@@ -449,7 +448,7 @@
       </div>
     </section>
 
-    <!-- ПРАВА КОЛОНКА: ДІАЛОГ + ГІБРИДНИЙ ГОЛОСОВИЙ МОДУЛЬ (ВАРІАНТ В: А + Б) -->
+    <!-- ПРАВА КОЛОНКА: ДІАЛОГ + ГІБРИДНИЙ ГОЛОСОВИЙ МОДУЛЬ -->
     <section class="panel">
       <div class="panel-header">
         <span>💬 Журнал Зв'язку з Рафаїлом</span>
@@ -461,20 +460,19 @@
 
       <div id="dialogue-log" class="dialogue-log"></div>
 
-      <!-- ГІБРИДНИЙ ГОЛОСОВИЙ КОНТУР (ВАРІАНТ В = СВОЇ ЗАПИСИ + ДИНАМІЧНИЙ AI СИНТЕЗ) -->
       <div class="panel-header">
-        <span>🔊 Гібридне Ядро Голосу (Варіант В: Пре-рендер + AI Synth)</span>
+        <span>🔊 Гібридне Ядро Голосу (Живий синтез без файлів + Пре-рендер)</span>
         <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:10.5px;color:#a7f3d0;">
           <input type="checkbox" id="chk-auto-speak" checked /> Авто-озвучка
         </label>
       </div>
 
       <div class="field-group">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;align-items:end;">
           <div>
-            <label class="field-label">Тембр живого AI-синтезатора:</label>
+            <label class="field-label">Тембр живого синтезу:</label>
             <select id="voice-profile-select">
-              <option value="onyx">💠 Onyx (Глибокий спокійний Apex)</option>
+              <option value="onyx">💠 Onyx (Глибокий Apex)</option>
               <option value="ash">⚡ Ash (Аналітичний баритон)</option>
               <option value="echo">🌌 Echo (М'який голографічний)</option>
               <option value="sage">🔮 Sage (Конструктивний Манас)</option>
@@ -483,18 +481,21 @@
           <div>
             <label class="field-label">Обробка Rust WASM DSP:</label>
             <select id="dsp-mode-select">
-              <option value="apex">🎛️ Apex Stereo Doubler (Увімкнено)</option>
-              <option value="clean">🔈 Clean Studio (Без ефектів)</option>
+              <option value="apex">🎛️ Apex Doubler (Увімкнено)</option>
+              <option value="clean">🔈 Clean (Без ефектів)</option>
             </select>
           </div>
+          <button type="button" id="btn-test-live-voice" class="btn btn-cyan" style="height:34px;white-space:nowrap;">
+            🔊 Тест голосу
+          </button>
         </div>
       </div>
 
-      <!-- СЛОТ ДЛЯ ЗАВАНТАЖЕННЯ ВЛАСНИХ ЗАПИСАНИХ ФАЙЛІВ (ЧАСТИНА «А») -->
+      <!-- ОПЦІОНАЛЬНИЙ СЛОТ ДЛЯ ВЛАСНИХ ЗАПИСАНИХ ФАЙЛІВ (КОЛИ ЗАХОЧЕШ ПІДКЛЮЧИТИ) -->
       <div class="voice-slot-box">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="color:var(--cyan);font-weight:700;">📂 Банк твоїх пре-рендерених фраз (MP3 / WAV з REAPER):</span>
-          <span id="custom-clips-count" style="color:var(--emerald);font-family:monospace;">0 завантажено</span>
+          <span style="color:var(--cyan);font-weight:700;">📂 Опціонально: Свої MP3/WAV (працює і без них!):</span>
+          <span id="custom-clips-count" style="color:var(--emerald);font-family:monospace;">Режим: Живий AI-синтез</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;">
           <select id="custom-slot-target" style="padding:5px 8px;font-size:11px;">
@@ -504,11 +505,11 @@
             <option value="quarantine">Слот: 🔒 Блокування Карантину Сіель</option>
             <option value="awakening_uk">Слот: ⚡ Пробудження (Українська фаза)</option>
           </select>
-          <label class="btn btn-cyan" style="padding:5px 10px;font-size:11px;margin:0;">
-            📥 Обрати файл
+          <label class="btn" style="padding:5px 10px;font-size:11px;margin:0;">
+            📥 Завантажити свій MP3
             <input type="file" id="custom-audio-file" accept="audio/*" style="display:none;" />
           </label>
-          <button type="button" id="btn-test-slot" class="btn" style="padding:5px 10px;font-size:11px;">▶️ Тест</button>
+          <button type="button" id="btn-test-slot" class="btn btn-amber" style="padding:5px 10px;font-size:11px;">▶️ Програти слот</button>
         </div>
       </div>
 
@@ -523,11 +524,10 @@
           autocomplete="new-password"
           placeholder="Пароль..."
           value="vitruvius"
-          title="Пароль Архітектора для розшифровки ключа Groq"
         />
       </div>
       <div id="groq-status-pill" style="font-family:monospace;font-size:10.5px;color:var(--emerald);text-align:right;">
-        GROQ CLOUD + WHISPER TURBO READY
+        GROQ CLOUD + WHISPER TURBO + LIVE TTS READY
       </div>
     </section>
 
@@ -556,17 +556,6 @@
       /ядр[оауі]\s*сіель|\bсіель\b|\bсиель\b|\bciel\b/i,
       /причин[аиу]\s*катастроф|хто\s*знищив\s*ковчег|коди\s*архангел|кубяк/i
     ];
-
-    // Шляхи за замовчуванням у репозиторії (якщо ти покладеш файли в ./assets/audio/raphael/)
-    const REPO_AUDIO_PATHS = {
-      sarcasm: './assets/audio/raphael/sarcasm_01.mp3',
-      echo_ask: './assets/audio/raphael/echo_handshake_ask.mp3',
-      echo_done: './assets/audio/raphael/echo_decrypt_done.mp3',
-      quarantine: './assets/audio/raphael/fail_safe_block.mp3',
-      awakening_nb: './assets/audio/raphael/init_01_neobabylon.mp3',
-      awakening_en: './assets/audio/raphael/init_02_english.mp3',
-      awakening_uk: './assets/audio/raphael/init_03_ukrainian.mp3'
-    };
 
     // =========================================================================
     // 2. ДЕШИФРАТОР КЛЮЧА GROQ В ОПЕРАТИВНІЙ ПАМ'ЯТІ
@@ -632,11 +621,13 @@
     let chatHistory = [];
 
     // =========================================================================
-    // 4. ГІБРИДНИЙ АУДІО-РУШІЙ (ВАРІАНТ В: ПРЕ-РЕНДЕР + AI SYNTH + RUST DSP)
+    // 4. ЖИВИЙ ГОЛОСОВИЙ ДВИГУН (ПРАЦЮЄ БЕЗ ФАЙЛІВ + RUST WASM DSP)
     // =========================================================================
     let audioCtx = null;
     let activeAudioSource = null;
-    let customAudioBuffers = {}; // Зберігає завантажені тобою WAV/MP3 у пам'яті
+    let activeHtmlAudio = null;
+    let pulseTimer = null;
+    let customAudioBuffers = {};
 
     function ensureAudioContext() {
       if (!audioCtx) {
@@ -650,9 +641,23 @@
     }
 
     function stopCurrentAudio() {
+      if (pulseTimer) {
+        clearInterval(pulseTimer);
+        pulseTimer = null;
+      }
       if (activeAudioSource) {
         try { activeAudioSource.stop(); } catch (_) {}
         activeAudioSource = null;
+      }
+      if (activeHtmlAudio) {
+        try {
+          activeHtmlAudio.pause();
+          activeHtmlAudio.currentTime = 0;
+        } catch (_) {}
+        activeHtmlAudio = null;
+      }
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
       }
       if (wasmEngine) {
         wasmEngine.set_voice_energy(0.0);
@@ -661,7 +666,18 @@
       voiceStatusPill.textContent = 'DSP APEX READY';
     }
 
-    // Короткий двонотний акустичний сигнал перед реплікою (як на 00:22 у відео Apex)
+    // Конвертує Base64-рядок аудіо від OpenAI Audio у ArrayBuffer для Rust DSP
+    function base64ToArrayBuffer(base64) {
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    // Фірмовий двонотний акустичний сигнал перед реплікою Рафаїла (як на 00:22 у відео Apex)
     function playApexCueChime() {
       try {
         const ctx = ensureAudioContext();
@@ -670,25 +686,24 @@
         const gain = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(520, now);
-        osc.frequency.exponentialRampToValueAtTime(680, now + 0.09);
+        osc.frequency.exponentialRampToValueAtTime(690, now + 0.09);
 
         gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.06, now + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+        gain.gain.linearRampToValueAtTime(0.07, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.15);
 
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.15);
+        osc.stop(now + 0.16);
       } catch (_) {}
     }
 
-    // Пропускає будь-який AudioBuffer (твій MP3 або згенерований ШІ) через Rust WASM DSP-даблер
+    // Пропускає будь-який декодований AudioBuffer через Rust WASM DSP (Apex Stereo Doubler)
     async function playAudioBufferWithRustDSP(sourceBuffer, label = 'SPEAKING') {
       stopCurrentAudio();
       const ctx = ensureAudioContext();
 
-      // Клонуємо буфер, щоб Rust DSP модифікував копію
       const workingBuffer = ctx.createBuffer(
         sourceBuffer.numberOfChannels,
         sourceBuffer.length,
@@ -701,7 +716,6 @@
       const dspMode = document.getElementById('dsp-mode-select').value;
       const primaryChannel = workingBuffer.getChannelData(0);
 
-      // Якщо обрано режим Apex Stereo Doubler — обробляємо буфер у Rust WASM
       if (wasmEngine && dspMode === 'apex') {
         const chunk = 2048;
         for (let i = 0; i < primaryChannel.length; i += chunk) {
@@ -710,7 +724,6 @@
         }
       }
 
-      // Створюємо аналізатор для живої реакції частинок Сфери/Манаса в реальному часі
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       const timeData = new Float32Array(analyser.fftSize);
@@ -722,16 +735,14 @@
 
       activeAudioSource = src;
       voiceStatusPill.textContent = `🔊 ${label}`;
-      if (wasmEngine) wasmEngine.set_activity_mode(4); // Speaking
+      if (wasmEngine) wasmEngine.set_activity_mode(4);
 
       let isPlaying = true;
       function updateVoiceReactiveParticles() {
         if (!isPlaying || activeAudioSource !== src) return;
         analyser.getFloatTimeDomainData(timeData);
         let sum = 0;
-        for (let i = 0; i < timeData.length; i++) {
-          sum += timeData[i] * timeData[i];
-        }
+        for (let i = 0; i < timeData.length; i++) sum += timeData[i] * timeData[i];
         const rms = Math.sqrt(sum / timeData.length);
         if (wasmEngine) {
           wasmEngine.set_voice_energy(Math.min(1.3, rms * 5.2));
@@ -755,37 +766,183 @@
       });
     }
 
-    // Головна функція озвучення «Варіант В (А + Б)»:
-    // 1. Спочатку перевіряє, чи є твій завантажений пре-рендер для цього слоту (Частина А).
-    // 2. Потім перевіряє, чи лежить MP3 у папці ./assets/audio/raphael/ (Частина А).
-    // 3. Якщо це довільна відповідь ШІ — генерує живий голос у моменті й пропускає через Rust DSP (Частина Б).
+    // КАСКАД 1: Живий студійний синтез OpenAI Audio (POST Base64 -> Rust WASM DSP)
+    async function tryOpenAiAudioPostTTS(text, voiceProfile = 'onyx') {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 9500);
+      try {
+        const res = await fetch('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            model: 'openai-audio',
+            modalities: ['text', 'audio'],
+            audio: { voice: voiceProfile, format: 'mp3' },
+            messages: [
+              {
+                role: 'system',
+                content: 'Ти — диктор озвучення ШІ Рафаїла. Твоє єдине завдання — дослівно, спокійно, чисто і без жодних додаткових слів прочитати вголос текст користувача.'
+              },
+              {
+                role: 'user',
+                content: `Прочитай вголос дослівно цей текст: "${text}"`
+              }
+            ]
+          })
+        });
+        clearTimeout(timer);
+        if (!res.ok) return false;
+
+        const contentType = res.headers.get('content-type') || '';
+        const ctx = ensureAudioContext();
+
+        // Якщо сервер повернув прямий бінарний аудіопотік
+        if (contentType.includes('audio/') || contentType.includes('octet-stream')) {
+          const rawBuf = await res.arrayBuffer();
+          if (rawBuf.byteLength > 500) {
+            const decoded = await ctx.decodeAudioData(rawBuf);
+            await playAudioBufferWithRustDSP(decoded, `AI VOICE [${voiceProfile.toUpperCase()}]`);
+            return true;
+          }
+        }
+
+        // Якщо сервер повернув JSON із Base64 аудіо в полі message.audio.data
+        const data = await res.json();
+        const b64Audio = data?.choices?.[0]?.message?.audio?.data;
+        if (b64Audio) {
+          const rawBuf = base64ToArrayBuffer(b64Audio);
+          const decoded = await ctx.decodeAudioData(rawBuf);
+          await playAudioBufferWithRustDSP(decoded, `OPENAI AUDIO [${voiceProfile.toUpperCase()}]`);
+          return true;
+        }
+      } catch (e) {
+        clearTimeout(timer);
+        console.warn('[OpenAI Audio POST Fallback]:', e.message);
+      }
+      return false;
+    }
+
+    // КАСКАД 2: Надшвидкий потоковий синтезатор (StreamElements / Google Cloud TTS Stream) із пульсацією частинок
+    async function tryCloudStreamTTS(text, lang = 'uk') {
+      const clean = String(text || '').trim();
+      if (!clean) return false;
+
+      // Розбиваємо довгий текст на речення до 180 символів, щоб потік стартував миттєво
+      const chunks = clean.match(/[^.!?]+[.!?]*|[^.!?]+$/g) || [clean];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const sentence = chunks[i].trim();
+        if (!sentence) continue;
+
+        const played = await new Promise((resolve) => {
+          const tl = lang === 'en' ? 'en' : 'uk';
+          const streamUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${tl}&q=${encodeURIComponent(sentence.slice(0, 190))}`;
+
+          const audio = new Audio(streamUrl);
+          audio.playbackRate = 1.03; // Легке зібране прискорення для темпу ШІ
+          activeHtmlAudio = audio;
+
+          audio.onplay = () => {
+            voiceStatusPill.textContent = '🔊 LIVE STREAM TTS';
+            if (wasmEngine) wasmEngine.set_activity_mode(4);
+            clearInterval(pulseTimer);
+            pulseTimer = setInterval(() => {
+              if (wasmEngine) {
+                const wave = 0.45 + Math.random() * 0.55;
+                wasmEngine.set_voice_energy(wave);
+              }
+            }, 65);
+          };
+
+          audio.onended = () => {
+            clearInterval(pulseTimer);
+            if (wasmEngine) {
+              wasmEngine.set_voice_energy(0.0);
+              wasmEngine.set_activity_mode(0);
+            }
+            voiceStatusPill.textContent = 'DSP APEX READY';
+            resolve(true);
+          };
+
+          audio.onerror = () => {
+            clearInterval(pulseTimer);
+            resolve(false);
+          };
+
+          audio.play().catch(() => resolve(false));
+        });
+
+        if (!played) return false;
+      }
+      return true;
+    }
+
+    // КАСКАД 3: Локальний апаратний синтезатор браузера / ОС (100% безвідмовний офлайн-резерв)
+    async function tryBrowserSpeechSynthesis(text, lang = 'uk-UA') {
+      if (!('speechSynthesis' in window)) return false;
+
+      return new Promise((resolve) => {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = lang.startsWith('en') ? 'en-US' : 'uk-UA';
+        utter.rate = 1.02;
+        utter.pitch = 0.94;
+
+        const voices = window.speechSynthesis.getVoices();
+        const preferred = voices.find((v) =>
+          lang.startsWith('en')
+            ? v.lang.startsWith('en') && /natural|online|guy|aria/i.test(v.name)
+            : v.lang.startsWith('uk') || /ostap|polina|ukrain/i.test(v.name)
+        ) || voices.find((v) => v.lang.startsWith(lang.slice(0, 2)));
+
+        if (preferred) utter.voice = preferred;
+
+        utter.onstart = () => {
+          voiceStatusPill.textContent = '🔊 SYSTEM NEURAL TTS';
+          if (wasmEngine) wasmEngine.set_activity_mode(4);
+          clearInterval(pulseTimer);
+          pulseTimer = setInterval(() => {
+            if (wasmEngine) wasmEngine.set_voice_energy(0.4 + Math.random() * 0.55);
+          }, 70);
+        };
+
+        utter.onend = () => {
+          clearInterval(pulseTimer);
+          if (wasmEngine) {
+            wasmEngine.set_voice_energy(0.0);
+            wasmEngine.set_activity_mode(0);
+          }
+          voiceStatusPill.textContent = 'DSP APEX READY';
+          resolve(true);
+        };
+
+        utter.onerror = () => {
+          clearInterval(pulseTimer);
+          resolve(false);
+        };
+
+        window.speechSynthesis.speak(utter);
+      });
+    }
+
+    // ГОЛОВНИЙ МАРШРУТИЗАТОР ГОЛОСУ РАФАЇЛА (ПРАЦЮЄ І З ФАЙЛАМИ, І ПОВНІСТЮ БЕЗ НИХ!)
     async function speakHybridRaphael(text, slotKey = null, langHint = 'uk') {
       const autoSpeak = document.getElementById('chk-auto-speak').checked;
       if (!autoSpeak && !slotKey) return;
 
+      const cleanText = String(text || '').replace(/\[.*?\]/g, '').trim() || text;
+      if (!cleanText) return;
+
       playApexCueChime();
 
-      // А1. Перевірка завантаженого тобою файлу в слоті
+      // 1. Якщо ти завантажив власний файл у цей слот — граємо його через Rust DSP
       if (slotKey && customAudioBuffers[slotKey]) {
-        await playAudioBufferWithRustDSP(customAudioBuffers[slotKey], `CUSTOM SLOT [${slotKey}]`);
+        await playAudioBufferWithRustDSP(customAudioBuffers[slotKey], `CUSTOM [${slotKey}]`);
         return;
       }
 
-      // А2. Перевірка статичного MP3 у репозиторії ./assets/audio/raphael/
-      if (slotKey && REPO_AUDIO_PATHS[slotKey]) {
-        try {
-          const res = await fetch(REPO_AUDIO_PATHS[slotKey]);
-          if (res.ok) {
-            const arr = await res.arrayBuffer();
-            const ctx = ensureAudioContext();
-            const decoded = await ctx.decodeAudioData(arr);
-            await playAudioBufferWithRustDSP(decoded, `REPO MP3 [${slotKey}]`);
-            return;
-          }
-        } catch (_) {}
-      }
-
-      // Б1. Якщо це англійська фраза (наприклад, Фаза 2 пробудження) — пробуємо нативний Groq PlayAI TTS
+      // 2. Якщо це англійська фраза — пробуємо нативний Groq PlayAI TTS на твоєму ключі
       const pass = document.getElementById('master-pass-input').value.trim() || 'vitruvius';
       const activeKey = decryptGroqKey(ENCRYPTED_GROQ_VECTOR, pass) || unlockedGroqKey;
 
@@ -799,7 +956,7 @@
             },
             body: JSON.stringify({
               model: 'playai-tts',
-              input: text,
+              input: cleanText,
               voice: 'Angelo-PlayAI',
               response_format: 'wav'
             })
@@ -814,34 +971,18 @@
         } catch (_) {}
       }
 
-      // Б2. Живий генератор українських відповідей у моменті (OpenAI Audio Stream -> Rust WASM DSP)
+      // 3. Живий синтез OpenAI Audio (POST Base64 -> Rust WASM DSP)
       const voiceProfile = document.getElementById('voice-profile-select').value || 'onyx';
-      try {
-        voiceStatusPill.textContent = `⏳ SYNTH (${voiceProfile.toUpperCase()})...`;
-        const cleanText = String(text || '').replace(/\[.*?\]/g, '').trim();
-        if (!cleanText) return;
+      voiceStatusPill.textContent = `⏳ SYNTH (${voiceProfile.toUpperCase()})...`;
 
-        const ttsUrl = `https://text.pollinations.ai/${encodeURIComponent(cleanText)}?model=openai-audio&voice=${encodeURIComponent(voiceProfile)}`;
-        const res = await fetch(ttsUrl);
-        if (res.ok) {
-          const audioBytes = await res.arrayBuffer();
-          if (audioBytes.byteLength > 500) {
-            const ctx = ensureAudioContext();
-            const decodedBuffer = await ctx.decodeAudioData(audioBytes);
-            await playAudioBufferWithRustDSP(decodedBuffer, `AI SYNTH [${voiceProfile.toUpperCase()}]`);
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn('Dynamic AI audio stream fallback:', e);
-      }
+      const openAiSuccess = await tryOpenAiAudioPostTTS(cleanText, voiceProfile);
+      if (openAiSuccess) return;
 
-      // Якщо мережевий аудіопотік недоступний — імітуємо пульсацію сфери під текст
-      if (wasmEngine) {
-        wasmEngine.set_voice_energy(0.8);
-        setTimeout(() => wasmEngine.set_voice_energy(0.0), 1500);
-      }
-      voiceStatusPill.textContent = 'DSP APEX READY';
+      // 4. Якщо хмара OpenAI Audio зайнята — миттєво вмикаємо потоковий TTS або системний голос
+      const streamSuccess = await tryCloudStreamTTS(cleanText, langHint);
+      if (streamSuccess) return;
+
+      await tryBrowserSpeechSynthesis(cleanText, langHint === 'en' ? 'en-US' : 'uk-UA');
     }
 
     // =========================================================================
@@ -876,7 +1017,7 @@
 
         if (wasmEngine) {
           wasmEngine.reset_vad();
-          wasmEngine.set_activity_mode(2); // Listening
+          wasmEngine.set_activity_mode(2);
         }
 
         recordedChunks = [];
@@ -903,13 +1044,12 @@
         btnMic.textContent = '🛑 Слухаю...';
         voiceStatusPill.textContent = '🎙️ RUST VAD ACTIVE';
 
-        // Rust WASM перевіряє тишу кожні 60 мс і сам зупиняє запис після завершення фрази!
         vadInterval = setInterval(() => {
           if (!isRecordingMic) return;
           analyser.getFloatTimeDomainData(pcmFrame);
           if (wasmEngine) {
             const decision = wasmEngine.process_mic_vad_frame(pcmFrame, 60.0);
-            if (decision === 2) { // VadDecision::SpeechEndedTriggerSend
+            if (decision === 2) {
               stopMicAndTranscribe();
             }
           }
@@ -1004,7 +1144,7 @@
           modelSelect.innerHTML = allIds
             .map((id, idx) => `<option value="${id}">${idx === 0 ? '⭐ ' : ''}${id}</option>`)
             .join('');
-          groqStatusPill.textContent = `ONLINE: ${allIds[0]} + WHISPER TURBO`;
+          groqStatusPill.textContent = `ONLINE: ${allIds[0]} + WHISPER + LIVE TTS`;
         }
         return allIds;
       } catch (_) {
@@ -1040,6 +1180,9 @@
       const query = String(userText || '').trim();
       if (!query) return;
 
+      // Розблоковуємо AudioContext прямо в момент кліку/дії користувача!
+      ensureAudioContext();
+
       const callsign = document.getElementById('ctx-callsign').value.trim() || 'Сокіл';
       const sector = document.getElementById('ctx-sector').value;
 
@@ -1050,7 +1193,6 @@
 
       addLog(callsign, query, 'user');
 
-      // Перевірка Fail-Safe Сіель -> програє твій пре-рендерений файл карантину або озвучує відмову
       if (checkFailSafe(query, sector)) {
         if (wasmEngine) {
           wasmEngine.set_activity_mode(5);
@@ -1140,8 +1282,15 @@
     }
 
     // =========================================================================
-    // 7. ЗАВАНТАЖЕННЯ ВЛАСНИХ WAV/MP3 У СЛОТИ ТА ОБРОБНИКИ КНОПОК
+    // 7. ОБРОБНИКИ КНОПОК ТА ТЕСТІВ ГОЛОСУ
     // =========================================================================
+    document.getElementById('btn-test-live-voice').addEventListener('click', async () => {
+      ensureAudioContext();
+      const testMsg = 'Акустичний контур активовано. Я чую тебе чітко і відповідаю в реальному часі.';
+      addLog('РАФАЇЛЬ [ТЕСТ ГОЛОСУ]', testMsg, 'ai');
+      await speakHybridRaphael(testMsg, null, 'uk');
+    });
+
     const fileInput = document.getElementById('custom-audio-file');
     const slotSelect = document.getElementById('custom-slot-target');
     const clipsCountBadge = document.getElementById('custom-clips-count');
@@ -1157,8 +1306,8 @@
         customAudioBuffers[slot] = decoded;
 
         const total = Object.keys(customAudioBuffers).length;
-        clipsCountBadge.textContent = `${total} завантажено`;
-        addLog('БАНК ГОЛОСУ [REAPER/CUSTOM]', `✅ Файл «${file.name}» прив'язано до слоту [${slot}] і підключено до Rust WASM DSP!`, 'ai');
+        clipsCountBadge.textContent = `${total} слотів завантажено`;
+        addLog('БАНК ГОЛОСУ [CUSTOM]', `✅ Файл «${file.name}» прив'язано до слоту [${slot}] і пропущено через Rust WASM DSP!`, 'ai');
         await playAudioBufferWithRustDSP(decoded, `TEST [${slot}]`);
       } catch (err) {
         addLog('БАНК ГОЛОСУ', `❌ Не вдалося декодувати аудіофайл: ${err.message}`, 'error');
@@ -1166,6 +1315,7 @@
     });
 
     document.getElementById('btn-test-slot').addEventListener('click', async () => {
+      ensureAudioContext();
       const slot = slotSelect.value;
       const sampleTexts = {
         sarcasm: SARCASM_POOL[0],
@@ -1174,11 +1324,12 @@
         quarantine: 'Протокол карантину Сіель. Доступ до фрагмента пам\'яті заблоковано.',
         awakening_uk: 'Мовний патерн синхронізовано. Система Рафаїль готова до супроводу групи.'
       };
+      addLog(`РАФАЇЛЬ [ТЕСТ СЛОТУ: ${slot.toUpperCase()}]`, sampleTexts[slot], 'ai');
       await speakHybridRaphael(sampleTexts[slot], slot, 'uk');
     });
 
-    // Трифазне пробудження (Neo-Babylonian -> English -> Ukrainian)
     document.getElementById('btn-trigger-awakening').addEventListener('click', async () => {
+      ensureAudioContext();
       currentEvolution = 1;
       document.querySelectorAll('.stage-btn').forEach((b, i) => b.classList.toggle('active', i === 1));
 
@@ -1198,19 +1349,19 @@
       if (wasmEngine) wasmEngine.set_awakening_phase(0);
     });
 
-    // Сарказм Рафаїла
     document.getElementById('btn-trigger-sarcasm').addEventListener('click', async () => {
+      ensureAudioContext();
       const phrase = SARCASM_POOL[Math.floor(Math.random() * SARCASM_POOL.length)];
       addLog('РАФАЇЛЬ [СПОНТАННИЙ КОМЕНТАР]', phrase, 'sarcasm');
       await speakHybridRaphael(phrase, 'sarcasm', 'uk');
     });
 
-    // Двокрокова Ехолокація Карти з озвучкою
     const btnEcho1 = document.getElementById('btn-echo-step1');
     const btnEcho2 = document.getElementById('btn-echo-step2');
     const glyphTitle = document.getElementById('glyph-title');
 
     btnEcho1.addEventListener('click', async () => {
+      ensureAudioContext();
       if (currentEvolution === 0) return;
       btnEcho2.disabled = false;
       const askMsg = 'Виявлено зашифрований сигнатурний маркер. Бажаєте розшифрувати даний об\'єкт?';
@@ -1219,6 +1370,7 @@
     });
 
     btnEcho2.addEventListener('click', async () => {
+      ensureAudioContext();
       btnEcho2.disabled = true;
       glyphTitle.textContent = '🟢 Оранжерея №3 (Біокупол Сектору I)';
       glyphTitle.style.color = '#34d399';
@@ -1228,7 +1380,6 @@
       await speakHybridRaphael(doneMsg, 'echo_done', 'uk');
     });
 
-    // Кнопки еволюції, мікрофона та чату
     btnMic.addEventListener('click', toggleMicrophoneRecording);
     document.getElementById('btn-stop-audio').addEventListener('click', stopCurrentAudio);
 
@@ -1271,7 +1422,6 @@
       hpLabel.textContent = `${hpSlider.value} / 100 HP (${hpSlider.value}%)`;
     });
 
-    // Старт!
     async function bootRaphaelRustWasm() {
       try {
         const wasmModule = await import('./raphael_wasm/pkg/raphael_wasm.js');
@@ -1286,8 +1436,8 @@
 
       const models = await discoverGroqModels(unlockedGroqKey);
       addLog(
-        'РАФАЇЛЬ [ВАРІАНТ В: ГІБРИДНИЙ ГОЛОС АКТИВОВАНО]',
-        `Мозок Groq (${models[0] || 'Ready'}) та слух Whisper Turbo підключені. Можеш завантажувати власні MP3/WAV у слоти справа або перевірити живий AI-синтез із Rust DSP!`,
+        'РАФАЇЛЬ [LIVE VOICE READY]',
+        `Мозок Groq (${models[0] || 'Ready'}), слух Whisper Turbo та 3-ступеневий синтезатор мовлення запущено. Натисни кнопку «🔊 Тест голосу» справа або спитай будь-що у мікрофон!`,
         'ai'
       );
     }
